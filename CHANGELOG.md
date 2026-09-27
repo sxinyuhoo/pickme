@@ -2,6 +2,13 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.0.2
+
+### Fixed
+
+- The ask panel no longer preselects the first template in the list. Opening it and typing your own question used to run that question through the translation template, and the annotation was recorded as `template: 翻译` even though no template was chosen. "Ask directly" is now the default, as the dropdown implies.
+- The template dropdown is still there and still remembers your pick for the current panel; nothing else about templates changed.
+
 ## 1.0.1
 
 Addresses the automatic review report. The review's own linter now reports **0 errors** for this plugin.

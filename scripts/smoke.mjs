@@ -733,6 +733,12 @@ console.log('测试连接检查通过（fetch 被拦时自动回退，不再报 
 	assert.ok(collectText(panel).includes('m1p8x4'), '面板头应当显示这条批注的 id');
 	assert.ok(findByClass(panel, 'pickme-question'), '面板里应当有提问输入框');
 	assert.ok(findAllByTag(panel, 'select').length >= 2, '面板里应当有模板与模型两个下拉');
+	const templateSelect = findAllByTag(panel, 'select')[0];
+	assert.equal(
+		templateSelect.value,
+		'',
+		`模板下拉默认应为「直接提问」（空值），实际是 ${JSON.stringify(templateSelect.value)}`,
+	);
 	const buttonTexts = findAllByTag(panel, 'button').map((b) => b.text);
 	// 界面语言默认英文，所以这里断言的是英文文案
 	assert.ok(

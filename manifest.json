@@ -1,7 +1,7 @@
 {
   "id": "pickme",
   "name": "Pick Me",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "minAppVersion": "1.7.2",
   "description": "Annotate and ask questions about the text or region you select, in notes and PDFs, without leaving the page. Annotations live in their own Markdown files and stay linked to the source; the original document is never modified.",
   "author": "Sean",

@@ -297,9 +297,8 @@ export class AskPanel implements AskSink {
 		const box = root.createDiv({ cls: 'pickme-composer' });
 
 		const row = box.createDiv({ cls: 'pickme-row' });
-		if (this.templateName === '' && this.templateNames.length > 0) {
-			this.templateName = this.templateNames[0];
-		}
+		// 默认「直接提问」（空值）。曾经这里会把模板强制设成列表里的第一个，
+		// 结果用户自己打字提问也被套上翻译模板的提示词，批注里还记成「模板：翻译」。
 		const select = row.createEl('select', { cls: 'dropdown' });
 		select.createEl('option', { text: t('直接提问'), value: '' });
 		for (const name of this.templateNames) {
