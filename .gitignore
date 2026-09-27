@@ -14,5 +14,7 @@ annotations-index.md
 templates/
 
 # 开发过程文档与草稿留在本地，不随仓库发布（README 里只面向使用者）
-docs/
+docs/*
+!docs/screenshots/
+!docs/screenshots/**
 IDEA.md

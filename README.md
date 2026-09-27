@@ -6,6 +6,17 @@ Annotate and ask questions about what you select — in notes and in PDFs — wi
 
 Select text in a note, or drag a rectangle over a PDF page, and a panel opens right there: pick a template or ask your own question. Every annotation lives in its own Markdown file and stays linked to the source — the original document is never modified, not a single byte.
 
+## Screenshots
+
+| Select and ask | The answer, stored with the annotation |
+| --- | --- |
+| ![Select text in a note, the panel opens next to it](docs/screenshots/01-select-text-then-ask.png) | ![The answer appears in the panel and is saved to the annotation file](docs/screenshots/02-answer-in-panel.png) |
+| ![Drag a rectangle over a PDF page](docs/screenshots/03-pdf-region-annotate.png) | ![The annotation index, grouped by source document](docs/screenshots/04-annotation-index.png) |
+
+Drag a rectangle over a PDF page — the text of that region and its screenshot go to the model together, and the box stays on the page to reopen later:
+
+![The built-in pdf.js viewer with its outline](docs/screenshots/05-pdf-viewer-outline.png)
+
 ## Install
 
 - **Community plugins** (after this plugin is published): Settings → Community plugins → Browse → search *Pick Me* → Install → Enable.
