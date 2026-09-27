@@ -1,0 +1,243 @@
+import { App, normalizePath, TFile } from 'obsidian';
+
+/**
+ * 批注文件会落在两类位置，两边的 API 完全不同：
+ *
+ * 1. 库索引内（例如 30-批注/…）：走 Vault API，文件进索引，能被 Dataview 与双链看到。
+ * 2. 配置目录内（默认的 .obsidian/plugins/pickme/annotations）：Obsidian 不索引配置目录，
+ *    真机实测 Vault API 在这里会直接抛
+ *    `TypeError: Cannot read properties of null (reading 'path')`，
+ *    而 vault.adapter 的读写、建目录、列目录都正常。
+ *
+ * 这一层按路径自动选路，上层（仓库、模板、截图）不用关心批注目录设在哪。
+ */
+export class FileIO {
+	private app: App;
+	/** 非索引目录里的图片没法用 getResourcePath，缓存 blob url 给缩略图用 */
+	private urls = new Map<string, string>();
+
+	constructor(app: App) {
+		this.app = app;
+	}
+
+	configDir(): string {
+		return normalizePath(this.app.vault.configDir || '.obsidian');
+	}
+
+	/** 路径是否在库索引范围内 */
+	isIndexed(path: string): boolean {
+		const clean = normalizePath(path);
+		const config = this.configDir();
+		return clean !== config && !clean.startsWith(`${config}/`);
+	}
+
+	private fileOf(path: string): TFile | null {
+		const found = this.app.vault.getAbstractFileByPath(normalizePath(path));
+		return found instanceof TFile ? found : null;
+	}
+
+	async exists(path: string): Promise<boolean> {
+		if (this.isIndexed(path) && this.fileOf(path)) return true;
+		try {
+			return await this.app.vault.adapter.exists(normalizePath(path));
+		} catch {
+			return false;
+		}
+	}
+
+	async readText(path: string): Promise<string | null> {
+		const indexed = this.isIndexed(path) ? this.fileOf(path) : null;
+		if (indexed) return await this.app.vault.read(indexed);
+		try {
+			const clean = normalizePath(path);
+			if (!(await this.app.vault.adapter.exists(clean))) return null;
+			return await this.app.vault.adapter.read(clean);
+		} catch {
+			return null;
+		}
+	}
+
+	async writeText(path: string, text: string): Promise<void> {
+		const clean = normalizePath(path);
+		const indexed = this.isIndexed(path) ? this.fileOf(path) : null;
+		if (indexed) {
+			await this.app.vault.modify(indexed, text);
+			return;
+		}
+		await this.ensureParent(clean);
+		if (this.isIndexed(path)) {
+			try {
+				await this.app.vault.create(clean, text);
+				return;
+			} catch {
+				// 已存在或索引未就绪：退回 adapter 写，至少内容落盘
+			}
+		}
+		await this.app.vault.adapter.write(clean, text);
+	}
+
+	async readBinary(path: string): Promise<ArrayBuffer | null> {
+		const indexed = this.isIndexed(path) ? this.fileOf(path) : null;
+		if (indexed) return await this.app.vault.readBinary(indexed);
+		try {
+			return await this.app.vault.adapter.readBinary(normalizePath(path));
+		} catch {
+			return null;
+		}
+	}
+
+	async writeBinary(path: string, data: ArrayBuffer): Promise<void> {
+		const clean = normalizePath(path);
+		const indexed = this.isIndexed(path) ? this.fileOf(path) : null;
+		if (indexed) {
+			await this.app.vault.modifyBinary(indexed, data);
+			return;
+		}
+		await this.ensureParent(clean);
+		if (this.isIndexed(path)) {
+			try {
+				await this.app.vault.createBinary(clean, data);
+				return;
+			} catch {
+				// 同上
+			}
+		}
+		await this.app.vault.adapter.writeBinary(clean, data);
+	}
+
+	/** 删除文件：索引内的进系统回收站，配置目录里的直接删 */
+	async remove(path: string): Promise<void> {
+		const indexed = this.isIndexed(path) ? this.fileOf(path) : null;
+		if (indexed) {
+			await this.app.vault.trash(indexed, true);
+			return;
+		}
+		try {
+			await this.app.vault.adapter.remove(normalizePath(path));
+		} catch {
+			// 文件本来就不在，忽略
+		}
+	}
+
+	/**
+	 * 逐级建目录，两种路径都支持。
+	 *
+	 * 冷启动时插件比库索引先就绪，那一刻 getAbstractFileByPath 对已存在的目录
+	 * 也返回 null，只看索引就会对着已存在的目录调 createFolder 并抛
+	 * `Error: Folder already exists.`，整个 onload 挂掉。所以索引判定之外
+	 * 还要兜住异常、并以 adapter 是否存在为准。
+	 */
+	async ensureFolder(dir: string): Promise<void> {
+		const clean = normalizePath(dir).replace(/^\/+|\/+$/g, '');
+		if (!clean) return;
+		let current = '';
+		for (const segment of clean.split('/')) {
+			current = current ? `${current}/${segment}` : segment;
+			if (await this.dirExists(current)) continue;
+			try {
+				if (this.isIndexed(current)) {
+					try {
+						await this.app.vault.createFolder(current);
+					} catch {
+						await this.app.vault.adapter.mkdir(current);
+					}
+				} else {
+					await this.app.vault.adapter.mkdir(current);
+				}
+			} catch {
+				// 已被别处建好，继续
+			}
+		}
+	}
+
+	/** 目录是否已存在：索引与 adapter 都问一遍，任一说有就算有 */
+	private async dirExists(dir: string): Promise<boolean> {
+		if (this.isIndexed(dir) && this.app.vault.getAbstractFileByPath(dir)) return true;
+		try {
+			return await this.app.vault.adapter.exists(normalizePath(dir));
+		} catch {
+			return false;
+		}
+	}
+
+	async ensureParent(filePath: string): Promise<void> {
+		const parts = normalizePath(filePath).split('/');
+		parts.pop();
+		if (parts.length === 0) return;
+		await this.ensureFolder(parts.join('/'));
+	}
+
+	/** 递归列出目录下的全部文件路径 */
+	async listFiles(dir: string): Promise<string[]> {
+		const clean = normalizePath(dir).replace(/^\/+|\/+$/g, '');
+		if (!clean) return [];
+		const out: string[] = [];
+		const walk = async (current: string): Promise<void> => {
+			let listed: { files: string[]; folders: string[] };
+			try {
+				listed = await this.app.vault.adapter.list(current);
+			} catch {
+				return;
+			}
+			out.push(...listed.files.map((file) => normalizePath(file)));
+			for (const folder of listed.folders) await walk(folder);
+		};
+		await walk(clean);
+		return out;
+	}
+
+	/** 图片可用的 url：索引内用库的资源路径，配置目录内用 blob */
+	async resourceUrl(path: string): Promise<string | null> {
+		if (this.isIndexed(path)) {
+			try {
+				return this.app.vault.adapter.getResourcePath(normalizePath(path));
+			} catch {
+				return null;
+			}
+		}
+		const cached = this.urls.get(path);
+		if (cached) return cached;
+		const data = await this.readBinary(path);
+		if (!data) return null;
+		const url = URL.createObjectURL(new Blob([data]));
+		this.urls.set(path, url);
+		if (this.urls.size > 32) {
+			const oldest = this.urls.keys().next().value;
+			if (oldest !== undefined) {
+				const oldestUrl = this.urls.get(oldest);
+				if (oldestUrl) URL.revokeObjectURL(oldestUrl);
+				this.urls.delete(oldest);
+			}
+		}
+		return url;
+	}
+
+	/**
+	 * 把目录下的文件搬到另一个目录，返回搬动的文件数。
+	 * 逐文件读写再删除，因此跨越「索引内 ↔ 配置目录内」也能用。
+	 */
+	async migrateDir(fromDir: string, toDir: string): Promise<number> {
+		const from = normalizePath(fromDir).replace(/^\/+|\/+$/g, '');
+		const to = normalizePath(toDir).replace(/^\/+|\/+$/g, '');
+		if (!from || !to || from === to) return 0;
+		const files = await this.listFiles(from);
+		let moved = 0;
+		for (const file of files) {
+			const rel = file.slice(from.length + 1);
+			if (!rel) continue;
+			const target = `${to}/${rel}`;
+			if (/\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(file)) {
+				const data = await this.readBinary(file);
+				if (!data) continue;
+				await this.writeBinary(target, data);
+			} else {
+				const text = await this.readText(file);
+				if (text === null) continue;
+				await this.writeText(target, text);
+			}
+			await this.remove(file);
+			moved += 1;
+		}
+		return moved;
+	}
+}

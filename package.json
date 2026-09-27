@@ -1,0 +1,26 @@
+{
+  "name": "pickme",
+  "version": "1.0.0",
+  "description": "选中或框选后即时问答批注的 Obsidian 插件",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "assets": "node scripts/inline-pdf-assets.mjs",
+    "build": "npm run assets && npm run typecheck && node esbuild.config.mjs production",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.ts",
+    "smoke": "node scripts/smoke.mjs",
+    "verify": "npm run assets && npm run typecheck && npm test && npm run build && npm run smoke",
+    "install:vault": "node scripts/install.mjs"
+  },
+  "keywords": [],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "esbuild": "^0.28.2",
+    "obsidian": "^1.13.1",
+    "pdfjs-dist": "^4.10.38",
+    "typescript": "^7.0.2"
+  }
+}

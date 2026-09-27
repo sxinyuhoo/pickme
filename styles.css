@@ -1,0 +1,641 @@
+/* pickme 插件样式 */
+
+.pickme-sidebar {
+	--pickme-highlight: #f2c14e;
+	padding: 8px 10px 40px;
+}
+
+.pickme-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 8px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.pickme-file {
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.pickme-count,
+.pickme-meta,
+.pickme-status {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.pickme-composer {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.pickme-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+/* 确认弹窗里的动作行：确认/取消摆到右下角 */
+/* PDF 目录面板：左侧栏 + 滚动区 */
+.pickme-pdf-body {
+	flex: 1;
+	display: flex;
+	min-height: 0;
+}
+
+.pickme-pdf-toc {
+	flex: none;
+	width: 232px;
+	overflow: auto;
+	padding: 6px 4px;
+	border-right: 1px solid var(--background-modifier-border);
+}
+
+.pickme-pdf-toc.is-hidden {
+	display: none;
+}
+
+.pickme-pdf-toc-item {
+	padding: 3px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+	line-height: 1.35;
+	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.pickme-pdf-toc-item:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.pickme-pdf-toc-item.is-current {
+	color: var(--text-normal);
+	font-weight: 600;
+}
+
+.pickme-pdf-toc-item.is-nolink {
+	cursor: default;
+}
+
+.pickme-pdf-toc-toggle.is-hidden {
+	display: none;
+}
+
+.pickme-confirm-actions {
+	justify-content: flex-end;
+	margin-top: 14px;
+	gap: 10px;
+}
+
+.pickme-actions {
+	margin-top: 4px;
+}
+
+.pickme-question {
+	width: 100%;
+	resize: vertical;
+	font-family: inherit;
+}
+
+.pickme-checkbox {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.pickme-entries {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-top: 8px;
+}
+
+.pickme-card {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	padding: 8px;
+	background: var(--background-secondary);
+}
+
+.pickme-card.is-active {
+	border-color: var(--interactive-accent);
+}
+
+.pickme-card.is-stale {
+	opacity: 0.75;
+	border-style: dashed;
+}
+
+.pickme-card-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+}
+
+.pickme-tag {
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller);
+	background: var(--background-modifier-hover);
+	border-radius: 4px;
+	padding: 0 4px;
+}
+
+.pickme-kind {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.pickme-status-dot {
+	font-size: var(--font-ui-smaller);
+	margin-left: auto;
+}
+
+.pickme-status-dot.is-ok {
+	color: var(--color-green);
+}
+
+.pickme-status-dot.is-stale {
+	color: var(--color-red);
+}
+
+.pickme-selection {
+	margin: 6px 0;
+	padding-left: 8px;
+	border-left: 3px solid var(--pickme-highlight);
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+}
+
+.pickme-qa {
+	margin-top: 6px;
+	border-top: 1px dashed var(--background-modifier-border);
+	padding-top: 6px;
+}
+
+.pickme-qa summary {
+	cursor: pointer;
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+}
+
+.pickme-q {
+	margin-top: 4px;
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+}
+
+.pickme-a {
+	margin-top: 4px;
+	font-size: var(--font-ui-small);
+	user-select: text;
+}
+
+.pickme-empty {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	padding: 8px 0;
+}
+
+.pickme-suggest-preview {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+/* 原文里的批注标记，底色由 body 上的样式类决定 */
+.pickme-mark {
+	border-radius: 2px;
+	cursor: pointer;
+}
+
+.pickme-mark:hover {
+	background: color-mix(in srgb, var(--pickme-highlight) 55%, transparent);
+}
+
+.pickme-anchor-widget {
+	display: none;
+}
+
+body {
+	--pickme-highlight: #f2c14e;
+}
+
+/* ---------- 视觉标记的三种样式（body 上的类由设置决定） ---------- */
+
+body.pickme-mark-background .pickme-mark {
+	background: color-mix(in srgb, var(--pickme-highlight) 35%, transparent);
+}
+
+body.pickme-mark-underline .pickme-mark {
+	background: transparent;
+	border-bottom: 2px solid var(--pickme-highlight);
+}
+
+body.pickme-mark-border .pickme-mark {
+	background: transparent;
+	border-left: 3px solid var(--pickme-highlight);
+	padding-left: 4px;
+}
+
+/* ---------- 侧边栏 ---------- */
+
+.pickme-model {
+	max-width: 46%;
+}
+
+.pickme-pdf-mark.is-flash {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 1px;
+}
+
+/* ---------- PDF 查看器 ---------- */
+
+.pickme-pdf {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	padding: 0;
+}
+
+/* 工具栏按功能分段：目录 ｜ 翻页 ｜ 缩放 ｜ 显示，段之间一条细线，状态提示靠最右 */
+.pickme-pdf-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 3px;
+	padding: 5px 10px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	flex-wrap: wrap;
+}
+
+/* 段与段之间的细线 */
+.pickme-pdf-sep {
+	width: 1px;
+	height: 16px;
+	margin: 0 6px;
+	background: var(--background-modifier-border);
+}
+
+/* 图标按钮：工具栏上不放文字，悬停才给提示 */
+.pickme-icon-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: none;
+	border-radius: 5px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.pickme-icon-button:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/* 开着（目录展开 / 高亮开着）用强调色，关掉用更浅的灰 */
+.pickme-icon-button.is-active {
+	color: var(--text-accent);
+}
+
+.pickme-icon-button.is-off {
+	color: var(--text-faint);
+}
+
+.pickme-icon-button.is-hidden {
+	display: none;
+}
+
+.pickme-pdf-page {
+	width: 44px;
+	text-align: center;
+	padding: 2px 4px;
+}
+
+.pickme-pdf-total {
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+	margin: 0 4px 0 2px;
+	white-space: nowrap;
+}
+
+/* 缩放百分比：兼作「回到 100%」按钮 */
+.pickme-pdf-zoom {
+	min-width: 52px;
+	padding: 2px 6px;
+	border: none;
+	border-radius: 5px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-variant-numeric: tabular-nums;
+	cursor: pointer;
+}
+
+.pickme-pdf-zoom:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/* 状态提示：吃掉剩下的空间，窄了就省略号，绝不把工具栏挤成两行 */
+.pickme-pdf-status {
+	margin-left: auto;
+	flex: 1 1 40px;
+	min-width: 0;
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* 批注索引侧边栏 */
+.pickme-index-tools {
+	gap: 8px;
+	margin-bottom: 10px;
+}
+
+.pickme-index-filter {
+	flex: 1;
+	min-width: 0;
+}
+
+.pickme-index-link {
+	margin-left: auto;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.pickme-index-link:hover {
+	color: var(--text-accent);
+}
+
+.pickme-index-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.pickme-index-source {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	margin-bottom: 4px;
+}
+
+.pickme-index-name {
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.pickme-index-source .pickme-count {
+	margin-left: auto;
+}
+
+.pickme-index-entry {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	padding: 4px 6px;
+	border-radius: 5px;
+	cursor: pointer;
+}
+
+.pickme-index-entry:hover {
+	background: var(--background-modifier-hover);
+}
+
+.pickme-index-entry:focus-visible,
+.pickme-index-name:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+}
+
+.pickme-index-body {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+/* PDF 批注的框选小图：固定框 + cover，宽扁的区域截图也不会把行压成一条缝 */
+.pickme-index-thumb {
+	flex: 0 0 auto;
+	width: 56px;
+	height: 40px;
+	object-fit: cover;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 3px;
+}
+
+.pickme-index-what {
+	line-height: 1.35;
+}
+
+.pickme-index-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-top: 2px;
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+
+.pickme-index-ok {
+	color: var(--text-success);
+}
+
+.pickme-index-warn {
+	color: var(--text-warning);
+}
+
+/* 失效批注默认折起来，展开才逐条列出 */
+.pickme-index-stale-toggle {
+	margin-top: 4px;
+	padding: 3px 6px;
+	border-radius: 5px;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: var(--font-ui-smaller);
+	user-select: none;
+}
+
+.pickme-index-stale-toggle:hover {
+	background: var(--background-modifier-hover);
+}
+
+.pickme-index-stale-toggle:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+}
+
+.pickme-index-entry.is-stale {
+	opacity: 0.7;
+}
+
+.pickme-index-reason {
+	margin-top: 1px;
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+	line-height: 1.35;
+}
+
+.pickme-pdf-scroll {
+	flex: 1;
+	overflow: auto;
+	padding: 16px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	/* 连续滚动：一根滚动条管整个文档，滚动位置自己记，不用浏览器锚定 */
+	overflow-anchor: none;
+}
+
+/* 所有页竖着排成一根滚动条 */
+.pickme-pdf-stage {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 14px;
+}
+
+/* 单页：没渲染出来时也是同样大小的一张白纸，滚动条长度从一开始就是对的 */
+.pickme-pdf-sheet {
+	position: relative;
+	background: var(--background-primary);
+	box-shadow: var(--shadow-s);
+}
+
+.pickme-pdf-canvas {
+	display: block;
+}
+
+.pickme-pdf-overlay {
+	position: absolute;
+	inset: 0;
+	cursor: crosshair;
+}
+
+.pickme-pdf-marquee {
+	position: absolute;
+	border: 1px solid var(--interactive-accent);
+	background: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+	pointer-events: none;
+}
+
+.pickme-pdf-mark {
+	position: absolute;
+	border: 1px solid var(--pickme-highlight);
+	background: color-mix(in srgb, var(--pickme-highlight) 22%, transparent);
+	cursor: pointer;
+}
+
+.pickme-pdf-mark:hover {
+	background: color-mix(in srgb, var(--pickme-highlight) 40%, transparent);
+}
+
+.pickme-pdf-mark.is-stale {
+	border-style: dashed;
+	opacity: 0.7;
+}
+
+.pickme-pdf-mark.is-flash {
+	background: color-mix(in srgb, var(--interactive-accent) 55%, transparent);
+}
+
+.pickme-thumb {
+	display: block;
+	max-width: 100%;
+	max-height: 140px;
+	margin: 6px 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+/* ---------- 页面内提问面板（PDF 页面 / 阅读视图） ---------- */
+
+.pickme-inline-layer {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	z-index: 20;
+}
+
+.pickme-panel {
+	position: absolute;
+	pointer-events: auto;
+	width: 380px;
+	max-height: min(72%, 560px);
+	overflow: auto;
+	overscroll-behavior: contain;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px 10px 10px;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	box-shadow: var(--shadow-l);
+}
+
+.pickme-panel-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.pickme-panel-close {
+	margin-left: auto;
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: 16px;
+	line-height: 1;
+	padding: 0 4px;
+}
+
+.pickme-panel-close:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+
+.pickme-panel .pickme-selection {
+	margin: 0;
+}
+
+.pickme-panel-history {
+	border-top: 1px solid var(--background-modifier-border);
+	padding-top: 6px;
+}
+
+.pickme-panel .pickme-composer {
+	border-bottom: none;
+	padding: 0;
+}
+
+.pickme-hint {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	padding: 6px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+

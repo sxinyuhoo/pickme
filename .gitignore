@@ -1,0 +1,18 @@
+node_modules/
+main.js
+*.js.map
+.DS_Store
+
+# 构建中间产物（由 scripts/inline-pdf-assets.mjs 生成）
+src/generated/
+
+# 运行期数据：开发期库里的插件目录是软链到本仓库的，
+# 插件自管的东西会直接落在仓库里 —— 这些绝不能提交。
+data.json
+annotations/
+annotations-index.md
+templates/
+
+# 开发过程文档与草稿留在本地，不随仓库发布（README 里只面向使用者）
+docs/
+IDEA.md
