@@ -38,7 +38,7 @@ export function parseFrontmatter(text: string): ParsedFrontmatter {
 
 function quoteIfNeeded(value: string): string {
 	if (value === '') return '""';
-	const needQuote = /[:#\[\]{}",\n]/.test(value) || value !== value.trim();
+	const needQuote = /[:#[\]{}",\n]/.test(value) || value !== value.trim();
 	if (!needQuote) return value;
 	return `"${value.replace(/"/g, '\\"')}"`;
 }

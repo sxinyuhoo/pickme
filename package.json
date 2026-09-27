@@ -1,6 +1,6 @@
 {
   "name": "pickme",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "选中或框选后即时问答批注的 Obsidian 插件",
   "private": true,
   "type": "module",
@@ -16,6 +16,10 @@
   },
   "keywords": [],
   "license": "MIT",
+  "dependencies": {
+    "@codemirror/state": "^6.5.0",
+    "@codemirror/view": "^6.38.6"
+  },
   "devDependencies": {
     "@types/node": "^26.6.2",
     "esbuild": "^0.28.2",

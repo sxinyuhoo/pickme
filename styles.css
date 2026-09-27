@@ -639,3 +639,8 @@ body.pickme-mark-border .pickme-mark {
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
+
+/* 宿主视图是 static 定位时补的相对定位容器（面板的浮层要挂在它下面） */
+.pickme-ask-host-relative {
+	position: relative;
+}

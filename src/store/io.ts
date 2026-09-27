@@ -21,7 +21,7 @@ export class FileIO {
 	}
 
 	configDir(): string {
-		return normalizePath(this.app.vault.configDir || '.obsidian');
+		return normalizePath(this.app.vault.configDir);
 	}
 
 	/** 路径是否在库索引范围内 */
@@ -109,7 +109,7 @@ export class FileIO {
 	async remove(path: string): Promise<void> {
 		const indexed = this.isIndexed(path) ? this.fileOf(path) : null;
 		if (indexed) {
-			await this.app.vault.trash(indexed, true);
+			await this.app.fileManager.trashFile(indexed);
 			return;
 		}
 		try {
@@ -202,11 +202,12 @@ export class FileIO {
 		const url = URL.createObjectURL(new Blob([data]));
 		this.urls.set(path, url);
 		if (this.urls.size > 32) {
-			const oldest = this.urls.keys().next().value;
-			if (oldest !== undefined) {
+			for (const oldest of this.urls.keys()) {
+				// Map 的键顺序就是插入顺序，这里只回收最早的一条
 				const oldestUrl = this.urls.get(oldest);
 				if (oldestUrl) URL.revokeObjectURL(oldestUrl);
 				this.urls.delete(oldest);
+				break;
 			}
 		}
 		return url;

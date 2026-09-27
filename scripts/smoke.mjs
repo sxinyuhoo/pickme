@@ -33,6 +33,19 @@ globalThis.document = {
 	}),
 	createTreeWalker: () => ({ nextNode: () => null }),
 };
+// Obsidian 在全局暴露的 DOM 助手（插件里用 createEl/createSpan，比 document.createElement 更符合规范）
+globalThis.createEl = (tag, opts) => makeEl(tag, opts);
+globalThis.createSpan = (opts) => makeEl('span', opts);
+globalThis.createDiv = (opts) => makeEl('div', opts);
+
+/** 桩件版 app：真机上删批注走 app.fileManager.trashFile（尊重用户的删除偏好），桩件里等价于 vault.trash */
+const makeApp = (vault, extra = {}) => ({
+	vault,
+	fileManager: { trashFile: (file) => vault.trash(file) },
+	workspace: obsidian.workspace,
+	metadataCache: { getFileCache: () => null },
+	...extra,
+});
 
 // 页面内面板的最小 DOM 桩件：Obsidian 给 HTMLElement 挂的 createDiv/createEl 等方法
 function makeEl(tag = 'div', opts = {}) {
@@ -177,6 +190,7 @@ globalThis.window = {
 		for (const item of this.listeners.filter((entry) => entry.type === type)) item.fn(event);
 	},
 	setTimeout: (fn, ms) => setTimeout(fn, ms),
+	clearTimeout: (id) => clearTimeout(id),
 	devicePixelRatio: 1,
 };
 
@@ -220,7 +234,7 @@ const PickmePlugin = require(cjsFile).default;
 assert.equal(typeof PickmePlugin, 'function', '默认导出应当是插件类');
 
 const vault = new obsidian.Vault();
-const app = { vault, workspace: obsidian.workspace, metadataCache: { getFileCache: () => null } };
+const app = makeApp(vault);
 const plugin = new PickmePlugin(app, { id: 'pickme', name: 'Pick me', version: '0.1.0' });
 
 await plugin.onload();
@@ -253,12 +267,9 @@ assert.equal(plugin.settings.annotationDir, '.obsidian/plugins/pickme/annotation
 console.log(`插件表面检查通过：${plugin.commands.length} 个命令、1 个视图、1 个设置面板`);
 
 // 1.1 核心查看器已经占用 pdf 扩展名时，onload 不能抛错（Obsidian 真机上曾因此整个插件加载失败）
-const occupiedApp = {
-	vault: new obsidian.Vault(),
-	workspace: obsidian.workspace,
-	metadataCache: { getFileCache: () => null },
+const occupiedApp = makeApp(new obsidian.Vault(), {
 	viewRegistry: { isExtensionRegistered: (extension) => extension === 'pdf' },
-};
+});
 const occupiedPlugin = new PickmePlugin(occupiedApp, {
 	id: 'pickme',
 	name: 'Pick me',
@@ -590,11 +601,7 @@ console.log('超时中止检查通过（保留已完成部分并标注中断）'
 	// 目录早已存在（上一轮session 建过），但索引此刻看不见
 	coldVault.folders.add('.obsidian/plugins/pickme/annotations');
 	coldVault.folders.add('.obsidian/plugins/pickme/templates');
-	const coldApp = {
-		vault: coldVault,
-		workspace: obsidian.workspace,
-		metadataCache: { getFileCache: () => null },
-	};
+	const coldApp = makeApp(coldVault);
 	const coldPlugin = new PickmePlugin(coldApp, { id: 'pickme', name: 'Pick me', version: '0.1.0' });
 	let failed = null;
 	try {

@@ -145,15 +145,15 @@ function withTimeout<T>(
 	if (timeoutSec <= 0 && !signal) return work;
 	return new Promise<T>((resolve, reject) => {
 		let settled = false;
-		let timer: ReturnType<typeof setTimeout> | null = null;
+		let timer: number | null = null;
 		const finish = (run: () => void) => {
 			if (settled) return;
 			settled = true;
-			if (timer !== null) clearTimeout(timer);
+			if (timer !== null) window.clearTimeout(timer);
 			run();
 		};
 		if (timeoutSec > 0) {
-			timer = setTimeout(() => {
+			timer = window.setTimeout(() => {
 				onTimeout();
 				finish(() => reject(new Error('pickme-timeout')));
 			}, timeoutSec * 1000);
@@ -169,7 +169,7 @@ function withTimeout<T>(
 		}
 		work.then(
 			(value) => finish(() => resolve(value)),
-			(error) => finish(() => reject(error)),
+			(error) => finish(() => reject(error instanceof Error ? error : new Error(String(error)))),
 		);
 	});
 }
@@ -180,7 +180,7 @@ function combineSignal(signal: AbortSignal | undefined, timeoutSec: number) {
 	let timedOut = false;
 	const timer =
 		timeoutSec > 0
-			? setTimeout(() => {
+			? window.setTimeout(() => {
 					timedOut = true;
 					controller.abort();
 				}, timeoutSec * 1000)
@@ -192,7 +192,7 @@ function combineSignal(signal: AbortSignal | undefined, timeoutSec: number) {
 	return {
 		signal: controller.signal,
 		cleanup: () => {
-			if (timer !== null) clearTimeout(timer);
+			if (timer !== null) window.clearTimeout(timer);
 		},
 		timedOut: () => timedOut,
 	};
@@ -248,6 +248,9 @@ async function chatViaFetch(
 	const gate = combineSignal(request.signal, request.timeoutSec ?? 0);
 	let response: Response;
 	try {
+		// 这里只能用浏览器 fetch：Obsidian 的 requestUrl 由主进程发出、拿不到流式响应体，
+		// 只能等整个回答生成完再返回（长回答/深度思考时界面会长时间空白）。
+		// requestUrl 是兜底通道，见本函数的 catch 与 chat() 的 auto 分支。
 		response = await fetch(joinUrl(request.baseUrl, '/chat/completions'), {
 			method: 'POST',
 			headers: {
@@ -426,6 +429,7 @@ export async function listModels(
 		}
 	}
 
+	// requestUrl 上面已经试过；这里用 fetch 再试一次，覆盖「中转站只对浏览器请求放行」的情况
 	const response = await fetch(joinUrl(baseUrl, '/models'), {
 		headers: { Authorization: `Bearer ${apiKey}` },
 	});

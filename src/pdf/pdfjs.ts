@@ -46,7 +46,7 @@ class InlineCMapReaderFactory {
 	}
 
 	async fetch({ name }: { name: string }): Promise<{ cMapData: Uint8Array; isCompressed: boolean }> {
-		return { cMapData: lookup(decodedCmaps, CMAP_BASE64, name, ' CMap'), isCompressed: true };
+		return { cMapData: lookup(decodedCmaps, CMAP_BASE64, String(name), ' CMap'), isCompressed: true };
 	}
 }
 
@@ -58,7 +58,7 @@ class InlineStandardFontDataFactory {
 	}
 
 	async fetch({ filename }: { filename: string }): Promise<Uint8Array> {
-		return lookup(decodedFonts, STANDARD_FONT_BASE64, filename, '标准字体');
+		return lookup(decodedFonts, STANDARD_FONT_BASE64, String(filename), '标准字体');
 	}
 }
 

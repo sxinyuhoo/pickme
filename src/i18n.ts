@@ -289,6 +289,7 @@ export const EN: Record<string, string> = {
 		'pickme: annotation folder is now {v0}; existing annotations are still in the old folder — use "Migrate" in settings to move them',
 	'pickme：已迁移 {v0} 个文件到 {v1}，旧目录还剩 {v2} 个':
 		'pickme: moved {v0} file(s) to {v1}; {v2} left in the old folder',
+	'形如 sk-… 的密钥': 'A key like sk-…',
 	'pickme：已迁移 {v0} 个文件到 {v1}，旧目录已空（空文件夹留着，可以自己删）':
 		'pickme: moved {v0} file(s) to {v1}; the old folder is now empty (empty folders are left in place, delete them if you like)',
 };
@@ -296,7 +297,7 @@ export const EN: Record<string, string> = {
 let current: Language = 'en';
 
 /** 跟随设置切换语言；未知值一律当英文（默认语言） */
-export function setLanguage(language: Language | string | undefined): void {
+export function setLanguage(language: string | undefined): void {
 	current = language === 'zh' ? 'zh' : 'en';
 }
 
@@ -317,7 +318,7 @@ export function currentLanguage(): Language {
 export function t(zh: string, vars?: Record<string, string | number>): string {
 	const template = current === 'zh' ? zh : EN[zh] ?? zh;
 	if (!vars) return template;
-	return template.replace(/\{(\w+)\}/g, (all, key) =>
+	return template.replace(/\{(\w+)\}/g, (all, key: string) =>
 		key in vars ? String(vars[key]) : all,
 	);
 }

@@ -275,6 +275,16 @@ export function createObsidianStub() {
 		}
 	}
 	Notice.messages = [];
+	class Component {
+		load() {
+			this.loaded = true;
+		}
+
+		unload() {
+			this.loaded = false;
+		}
+	}
+
 	class MarkdownRenderer {
 		static async render() {}
 	}
@@ -308,6 +318,7 @@ export function createObsidianStub() {
 		Setting,
 		Notice,
 		FileView,
+		Component,
 		MarkdownRenderer,
 		MarkdownView,
 		editorInfoField: { name: 'editorInfo' },

@@ -180,7 +180,7 @@ export class PickmePdfView extends FileView {
 
 	/** 命令「在 PDF 上框选批注」的落点：把查看器拿到前台并提示操作方式 */
 	async focusSelectionMode(): Promise<void> {
-		this.app.workspace.revealLeaf(this.leaf);
+		await this.app.workspace.revealLeaf(this.leaf);
 		this.setStatus(t('框选模式：拖动鼠标框出一块区域'));
 	}
 
@@ -299,7 +299,7 @@ export class PickmePdfView extends FileView {
 		const slot = this.panelAnchorSlot;
 		if (this.panelEntryId) {
 			for (const item of this.slots) {
-				const mark = item.overlay.querySelector(`[data-pickme-id="${this.panelEntryId}"]`) as HTMLElement | null;
+				const mark = item.overlay.querySelector(`[data-pickme-id="${this.panelEntryId}"]`);
 				if (!mark) continue;
 				const rect = mark.getBoundingClientRect();
 				return {
@@ -402,7 +402,7 @@ export class PickmePdfView extends FileView {
 		if (!pdf) return;
 		let outline: RawOutlineItem[] | null = null;
 		try {
-			outline = (await pdf.getOutline()) as RawOutlineItem[] | null;
+			outline = await pdf.getOutline();
 		} catch {
 			outline = null;
 		}
@@ -718,7 +718,14 @@ export class PickmePdfView extends FileView {
 			slot.text = [];
 			for (const item of content.items) {
 				if ('str' in item) {
-					slot.text.push({ str: item.str, transform: item.transform, width: item.width, height: item.height });
+					// pdf.js 给的内容项在这个版本是 any，显式收口成已知字段，别让 any 顺着 push 渗进来
+					const textItem = item as { str: string; transform: number[]; width: number; height: number };
+					slot.text.push({
+						str: textItem.str,
+						transform: textItem.transform,
+						width: textItem.width,
+						height: textItem.height,
+					});
 				}
 			}
 			await this.drawMarksFor(slot);
@@ -827,7 +834,7 @@ export class PickmePdfView extends FileView {
 			'keydown',
 			(event) => {
 				if (!this.pdf || this.dragStart) return;
-				if (this.app.workspace.activeLeaf !== this.leaf) return;
+				if (this.app.workspace.getActiveViewOfType(PickmePdfView) !== this) return;
 				const active = document.activeElement;
 				if (isEditableElement(active)) return;
 				if (active && active !== document.body && !this.containerEl.contains(active)) return;
@@ -1027,7 +1034,7 @@ export class PickmePdfView extends FileView {
 			outHeight = Math.max(1, Math.round(outHeight * k));
 		}
 
-		const offscreen = document.createElement('canvas');
+		const offscreen = createEl('canvas');
 		offscreen.width = outWidth;
 		offscreen.height = outHeight;
 		const context = offscreen.getContext('2d');

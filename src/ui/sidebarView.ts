@@ -378,7 +378,7 @@ function shorten(text: string, limit: number): string {
 export async function activateSidebar(plugin: PickmePlugin): Promise<PickmeSidebarView> {
 	const existing = plugin.app.workspace.getLeavesOfType(VIEW_TYPE_PICKME);
 	if (existing.length > 0) {
-		plugin.app.workspace.revealLeaf(existing[0]);
+		await plugin.app.workspace.revealLeaf(existing[0]);
 		return existing[0].view as PickmeSidebarView;
 	}
 	const leaf = plugin.app.workspace.getRightLeaf(false);
@@ -387,6 +387,6 @@ export async function activateSidebar(plugin: PickmePlugin): Promise<PickmeSideb
 		throw new Error('no leaf');
 	}
 	await leaf.setViewState({ type: VIEW_TYPE_PICKME, active: true });
-	plugin.app.workspace.revealLeaf(leaf);
+	await plugin.app.workspace.revealLeaf(leaf);
 	return leaf.view as PickmeSidebarView;
 }

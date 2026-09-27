@@ -54,7 +54,7 @@ export default class PickmePlugin extends Plugin {
 	private pdfTakeover: 'registry' | 'intercept' | 'off' = 'off';
 	private lastAnnotationDir = '';
 	/** 批注变动后合并写索引笔记的定时器 */
-	private indexTimer: ReturnType<typeof setTimeout> | null = null;
+	private indexTimer: number | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -167,7 +167,8 @@ export default class PickmePlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const stored = ((await this.loadData()) ?? {}) as Partial<typeof DEFAULT_SETTINGS>;
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, stored);
 		// 老版本把索引表路径存在设置里，现在它归插件自己管：顺手把这个死字段从 data.json 里抹掉
 		delete (this.settings as unknown as Record<string, unknown>).indexPath;
 		const before = `${this.settings.annotationDir}|${this.settings.templateDir}`;
@@ -232,7 +233,7 @@ export default class PickmePlugin extends Plugin {
 	async openIndexView(): Promise<PickmeIndexView> {
 		const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_PICKME_INDEX);
 		if (existing.length > 0) {
-			this.app.workspace.revealLeaf(existing[0]);
+			await this.app.workspace.revealLeaf(existing[0]);
 			const view = existing[0].view;
 			if (view instanceof PickmeIndexView) {
 				await view.reload();
@@ -245,7 +246,7 @@ export default class PickmePlugin extends Plugin {
 			throw new Error('no leaf');
 		}
 		await leaf.setViewState({ type: VIEW_TYPE_PICKME_INDEX, active: true });
-		this.app.workspace.revealLeaf(leaf);
+		await this.app.workspace.revealLeaf(leaf);
 		const view = leaf.view;
 		if (view instanceof PickmeIndexView) return view;
 		throw new Error('unexpected view');
@@ -332,7 +333,8 @@ export default class PickmePlugin extends Plugin {
 	 */
 	private async takeOverPdfLeaf(file: TFile | null): Promise<void> {
 		if (this.pdfTakeover !== 'intercept') return;
-		const leaf = this.app.workspace.activeLeaf;
+		// activeLeaf 已废弃；取最近活跃的叶片，语义与此前一致
+		const leaf = this.app.workspace.getMostRecentLeaf();
 		const view = leaf?.view;
 		if (!leaf || !view) return;
 		if (view.getViewType() !== 'pdf') return;
@@ -364,7 +366,7 @@ export default class PickmePlugin extends Plugin {
 			active: true,
 			state: { file: target.path },
 		});
-		this.app.workspace.revealLeaf(leaf);
+		await this.app.workspace.revealLeaf(leaf);
 	}
 
 	/** 当前打开着某个 PDF 的 Pick Me 查看器 */
@@ -761,7 +763,7 @@ export default class PickmePlugin extends Plugin {
 			}
 			const openView = this.pdfViewFor(target.path);
 			if (openView) {
-				this.app.workspace.revealLeaf(openView.leaf);
+				await this.app.workspace.revealLeaf(openView.leaf);
 				await openView.focusEntry(id);
 				return;
 			}
@@ -973,8 +975,8 @@ export default class PickmePlugin extends Plugin {
 
 	/** 批注变动后延迟合一次索引写入 */
 	scheduleIndexRefresh(): void {
-		if (this.indexTimer !== null) clearTimeout(this.indexTimer);
-		this.indexTimer = setTimeout(() => {
+		if (this.indexTimer !== null) window.clearTimeout(this.indexTimer);
+		this.indexTimer = window.setTimeout(() => {
 			this.indexTimer = null;
 			void this.repository.buildIndex(this.indexFilePath());
 		}, 1200);

@@ -38,6 +38,7 @@
 
 - 本插件：MIT，见 [LICENSE](./LICENSE)。
 - 内置 [pdf.js](https://github.com/mozilla/pdf.js)（`pdfjs-dist@4.10.38`，Apache-2.0）用于 PDF 渲染，其 CMap 与标准字体由 `scripts/inline-pdf-assets.mjs` 内联进产物。
+- pdf.js 里有用于字体渲染的 `new Function` 代码路径，本插件显式关闭（`src/pdf/pdfjs.ts` 的 `isEvalSupported: false`），运行期不会执行任何动态生成的代码；自动审查仍会提示「动态代码执行」，因为这段代码确实存在于产物里。
 
 ## 现状
 

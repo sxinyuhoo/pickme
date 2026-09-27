@@ -124,7 +124,16 @@ export class PickmeSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	display(): void {
+	/**
+	 * Obsidian 打开设置页时调用的入口。
+	 * 官方检查指明 display() 自 1.13 起已废弃，所以它只做转发，
+	 * 插件内部的「改完设置重建这一页」统一走 renderSettings()。
+	 */
+	override display(): void {
+		this.renderSettings();
+	}
+
+	renderSettings(): void {
 		const { containerEl } = this;
 		containerEl.empty();
 		// 官方规范：设置页不加顶级标题（General / Settings / 插件名），通用设置直接放最上面
@@ -138,7 +147,7 @@ export class PickmeSettingTab extends PluginSettingTab {
 					setLanguage(this.plugin.settings.language);
 					await this.plugin.saveSettings();
 					await this.plugin.refreshUiText();
-					this.display();
+					this.renderSettings();
 				});
 			});
 
@@ -201,7 +210,7 @@ export class PickmeSettingTab extends PluginSettingTab {
 			.addButton((button) =>
 				button.setButtonText(t('恢复')).onClick(async () => {
 					await this.plugin.ensureDefaultTemplates(true);
-					this.display();
+					this.renderSettings();
 				}),
 			);
 		// 模板清单：勾上就在提问面板的下拉里出现（取消勾选只是隐藏，文件不删）；自建模板排在内置的下面
@@ -247,7 +256,7 @@ export class PickmeSettingTab extends PluginSettingTab {
 									() => {
 										void (async () => {
 											await this.plugin.deleteTemplate(name);
-											this.display();
+											this.renderSettings();
 										})();
 									},
 								).open();
@@ -261,7 +270,7 @@ export class PickmeSettingTab extends PluginSettingTab {
 			.addButton((button) =>
 				button.setButtonText(t('新建')).onClick(async () => {
 					await this.plugin.createTemplate();
-					this.display();
+					this.renderSettings();
 				}),
 			);
 
@@ -279,11 +288,11 @@ export class PickmeSettingTab extends PluginSettingTab {
 					}),
 			);
 		new Setting(containerEl)
-			.setName('API Key')
+			.setName('API key')
 			.setDesc(t('保存在本机插件配置里，不会随库同步。'))
 			.addText((text) => {
 				text.inputEl.type = 'password';
-				text.setPlaceholder('sk-...')
+				text.setPlaceholder(t('形如 sk-… 的密钥'))
 					.setValue(this.plugin.settings.apiKey)
 					.onChange(async (value) => {
 						this.plugin.settings.apiKey = value.trim();
@@ -309,7 +318,6 @@ export class PickmeSettingTab extends PluginSettingTab {
 				slider
 					.setLimits(0, 1, 0.1)
 					.setValue(this.plugin.settings.temperature)
-					.setDynamicTooltip()
 					.onChange(async (value) => {
 						this.plugin.settings.temperature = value;
 						await this.plugin.saveSettings();
@@ -352,7 +360,7 @@ export class PickmeSettingTab extends PluginSettingTab {
 			.addButton((button) =>
 				button.setButtonText(t('从接口拉取')).onClick(async () => {
 					await this.plugin.fetchModelList();
-					this.display();
+					this.renderSettings();
 				}),
 			);
 		new Setting(containerEl)
@@ -514,7 +522,6 @@ export class PickmeSettingTab extends PluginSettingTab {
 				slider
 					.setLimits(0.6, 3, 0.2)
 					.setValue(this.plugin.settings.pdfDefaultScale)
-					.setDynamicTooltip()
 					.onChange(async (value) => {
 						this.plugin.settings.pdfDefaultScale = value;
 						await this.plugin.saveSettings();

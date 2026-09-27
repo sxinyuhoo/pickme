@@ -1,4 +1,4 @@
-import { MarkdownRenderer, TFile } from 'obsidian';
+import { Component, MarkdownRenderer, TFile } from 'obsidian';
 import { t } from '../i18n.ts';
 import type PickmePlugin from '../main.ts';
 import { parseAnnotationDoc } from '../core/annotationDoc.ts';
@@ -107,6 +107,13 @@ export class AskPanel implements AskSink {
 	 */
 	private lastPosition: { left: number; top: number } | null = null;
 
+	/**
+	 * 面板自己的组件容器。官方检查要求：不能直接把主插件实例当组件传给
+	 * MarkdownRenderer——它的生命周期跟插件一样长，渲染出来的 DOM 会被它一直记着，
+	 * 面板关了也回收不掉。
+	 */
+	private readonly child: Component = new Component();
+
 	constructor(options: AskPanelOptions) {
 		this.plugin = options.plugin;
 		this.host = options.host;
@@ -115,6 +122,7 @@ export class AskPanel implements AskSink {
 		this.resolveAnchor = options.resolveAnchor ?? (() => null);
 		this.fresh = options.fresh ?? false;
 		this.onClose = options.onClose ?? (() => undefined);
+		this.child.load();
 	}
 
 	async open(): Promise<void> {
@@ -137,6 +145,7 @@ export class AskPanel implements AskSink {
 		this.layer?.remove();
 		this.layer = null;
 		this.root = null;
+		this.child.unload();
 		this.onClose();
 		void this.discardIfUntouched();
 	}
@@ -222,7 +231,7 @@ export class AskPanel implements AskSink {
 		if (this.layer) return;
 		// 宿主视图可能是 static 定位，补一个相对定位容器，面板才能贴着选区浮在上面
 		const style = window.getComputedStyle(this.host);
-		if (style.position === 'static') this.host.style.position = 'relative';
+		if (style.position === 'static') this.host.addClass('pickme-ask-host-relative');
 		const layer = this.host.createDiv({ cls: 'pickme-inline-layer' });
 		// 面板是浮层，不是文档的一部分：内容滚到头以后，滚轮不该继续传给底下的文档。
 		// 否则文档一动，面板就跟着锚点跑，用户看到的是「在框里滚动，框自己动了」。
@@ -406,7 +415,7 @@ export class AskPanel implements AskSink {
 					qa.answer,
 					answer,
 					entry.kind === 'pdf' ? '' : this.file.path,
-					this.plugin,
+					this.child,
 				);
 			}
 		});

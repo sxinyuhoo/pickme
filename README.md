@@ -131,3 +131,4 @@ The repository ships the plugin source and build scripts only. Design and accept
 
 - This plugin: MIT, see [LICENSE](./LICENSE).
 - Bundles [pdf.js](https://github.com/mozilla/pdf.js) (`pdfjs-dist@4.10.38`, Apache-2.0) for PDF rendering; its CMap tables and standard fonts are inlined by `scripts/inline-pdf-assets.mjs`.
+- pdf.js contains font-rendering code paths that build functions with `new Function`. Pick Me disables them (`isEvalSupported: false` in `src/pdf/pdfjs.ts`), so no generated code is ever evaluated — the automated review still shows a "dynamic code execution" note because that code is present in the bundle.

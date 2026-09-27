@@ -31,7 +31,7 @@ export class AnchorSuggestModal extends SuggestModal<AnchorChoice> {
 	}
 
 	renderSuggestion(choice: AnchorChoice, el: HTMLElement): void {
-		el.createDiv({ text: `${choice.entry.id}　${choice.source}` });
+		el.createDiv({ text: `${choice.entry.id} ${choice.source}` });
 		const preview = choice.entry.kind === 'pdf' ? `第 ${choice.entry.pdf?.page ?? '?'} 页区域` : choice.entry.selection;
 		el.createDiv({ text: preview.slice(0, 80), cls: 'pickme-suggest-preview' });
 	}

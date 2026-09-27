@@ -17,10 +17,7 @@ class AnchorWidget extends WidgetType {
 	}
 
 	toDOM(): HTMLElement {
-		const span = document.createElement('span');
-		span.className = 'pickme-anchor-widget';
-		span.setAttribute('data-pickme-id', this.id);
-		return span;
+		return createSpan({ cls: 'pickme-anchor-widget', attr: { 'data-pickme-id': this.id } });
 	}
 }
 
@@ -143,9 +140,7 @@ function wrapBetween(start: HTMLElement, end: HTMLElement, id: string): void {
 	for (const text of targets) {
 		const parent = text.parentElement;
 		if (!parent) continue;
-		const span = document.createElement('span');
-		span.className = MARK_CLASS;
-		span.setAttribute('data-pickme-id', id);
+		const span = createSpan({ cls: MARK_CLASS, attr: { 'data-pickme-id': id } });
 		parent.insertBefore(span, text);
 		span.appendChild(text);
 	}
