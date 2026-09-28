@@ -2,6 +2,16 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.0.3
+
+### Changed
+
+- The inlined pdf.js resources (CMap tables and standard fonts) are now packed as one gzip stream per group instead of one base64 blob per file. `main.js` drops from **4.5 MB to 3.8 MB** (`-16%`), so installing and updating from the community plugin browser downloads less and is less likely to be cut off on a slow or unstable connection. Nothing about PDF rendering changes: the same 168 CMap tables and 16 standard fonts ship inside the file, and they are decompressed once, lazily, the first time a PDF actually needs them.
+
+### Added
+
+- A test that decompresses the packed resources and compares the result **byte for byte** with the original `pdfjs-dist` files, so a packing mistake cannot slip through silently.
+
 ## 1.0.2
 
 ### Fixed

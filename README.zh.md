@@ -263,7 +263,7 @@ src/generated/内联的 pdf.js CMap 与标准字体（构建时生成，不入�
 
 ## 已知限制
 
-- pdf.js 的 CMap 与标准字体已内联进 `main.js`（构建时由 `npm run assets` 生成），代价是 `main.js` 约 4.2 MB。
+- pdf.js 的 CMap 与标准字体已内联进 `main.js`（构建时由 `npm run assets` 生成，整体 gzip 打包、用到时惰性解压一次），代价是 `main.js` 约 3.8 MB。
 - 不支持移动端：自带 pdf.js 查看器与区域截图都依赖桌面端能力。
 - 窗口被最小化或被其他窗口完全遮住时，Chromium 会停掉 requestAnimationFrame，pdf.js 的渲染也跟着停（页面暂时画不出来）。切回前台会自动补画；若状态栏提示渲染超时，点它旁边的「重试」即可。
 - 连续滚动下页面尺寸在打开时就全部量好，所以首次打开很长的 PDF（上千页）会多花一点准备时间；滚动条长度从第一帧起就是准的。

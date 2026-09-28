@@ -108,7 +108,7 @@ Full section-by-section explanation of every setting: [README.zh.md](README.zh.m
 
 ## Limitations
 
-- `main.js` is about 4.2 MB because pdf.js's CMap tables and standard fonts are inlined — the price of needing no network for PDF rendering.
+- `main.js` is about 3.8 MB because pdf.js's CMap tables and standard fonts are inlined — the price of needing no network for PDF rendering. They ship as one gzip stream per group and are decompressed once, on demand, so the download stays as small as this feature allows.
 - Desktop only.
 - When the window is minimized or fully occluded, Chromium stops `requestAnimationFrame` and pdf.js rendering pauses; it repaints when the window returns.
 - Anchor tags are visible in source mode (`<pickme id="xxxxxx"></pickme>`) but hidden in editing and reading views.

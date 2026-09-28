@@ -1,11 +1,32 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CMAP_BASE64, CMAP_COUNT, STANDARD_FONT_BASE64, STANDARD_FONT_COUNT } from '../src/generated/pdfAssets.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+import {
+	CMAP_COUNT,
+	CMAP_INDEX,
+	CMAP_PACK_BASE64,
+	STANDARD_FONT_COUNT,
+	STANDARD_FONT_INDEX,
+	STANDARD_FONT_PACK_BASE64,
+} from '../src/generated/pdfAssets.ts';
 
 /**
- * 与 src/pdf/pdfjs.ts 里的 VaultCMapReaderFactory 同形，把「按需解码一份 base64」这一步换成
- * 直接读构建时内联进来的资源——CMap 早已编进 main.js，运行时不再依赖任何外部目录。
+ * 与 src/pdf/pdfjs.ts 里的内联工厂同形：内置资源是「所有文件拼接后整体 gzip」，
+ * 这里同样解整包再按索引切片——测的就是构建产物里那份数据本身。
  */
+async function inflate(base64: string): Promise<Uint8Array> {
+	const binary = Buffer.from(base64, 'base64');
+	const stream = new Blob([new Uint8Array(binary)]).stream().pipeThrough(new DecompressionStream('gzip'));
+	return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+function slice(whole: Uint8Array, index: Record<string, [number, number]>, key: string): Uint8Array {
+	const range = index[key];
+	if (!range) throw new Error(`缺少内联资源：${key}`);
+	return whole.slice(range[0], range[0] + range[1]);
+}
+
 class InlineCMapReaderFactory {
 	baseUrl: string;
 	isCompressed: boolean;
@@ -16,9 +37,8 @@ class InlineCMapReaderFactory {
 	}
 
 	async fetch({ name }: { name: string }): Promise<{ cMapData: Uint8Array; isCompressed: boolean }> {
-		const data = CMAP_BASE64[name];
-		if (!data) throw new Error(`缺少内联的 CMap：${name}`);
-		return { cMapData: new Uint8Array(Buffer.from(data, 'base64')), isCompressed: true };
+		const whole = await inflate(CMAP_PACK_BASE64);
+		return { cMapData: slice(whole, CMAP_INDEX, String(name)), isCompressed: true };
 	}
 }
 
@@ -50,13 +70,34 @@ function buildCjkPdf(): Uint8Array {
 
 test('CMap 与标准字体已经内联进源码（构建产物不再依赖外部目录）', () => {
 	assert.ok(CMAP_COUNT >= 160, `内联的 CMap 偏少：${CMAP_COUNT}（先跑 npm run assets）`);
-	assert.ok('GBK-EUC-H' in CMAP_BASE64, '缺少中文用的 GBK-EUC-H');
+	assert.ok('GBK-EUC-H' in CMAP_INDEX, '缺少中文用的 GBK-EUC-H');
 	assert.equal(
-		Object.keys(STANDARD_FONT_BASE64).length,
+		Object.keys(STANDARD_FONT_INDEX).length,
 		STANDARD_FONT_COUNT,
 		'标准字体数量与声明的对不上（先跑 npm run assets）',
 	);
 	assert.ok(STANDARD_FONT_COUNT >= 10, `内联的标准字体偏少：${STANDARD_FONT_COUNT}`);
+	assert.equal(Object.keys(CMAP_INDEX).length, CMAP_COUNT, 'CMap 索引数量与声明的对不上');
+});
+
+test('整包解压后按索引切出来的字节，与 pdfjs-dist 里的原文件逐字节一致', async () => {
+	const source = path.resolve(import.meta.dirname, '..', 'node_modules', 'pdfjs-dist');
+	assert.ok(fs.existsSync(source), '缺少 node_modules/pdfjs-dist，无法做字节级校验');
+
+	const cmaps = await inflate(CMAP_PACK_BASE64);
+	for (const name of ['GBK-EUC-H', 'UniGB-UCS2-H', 'Adobe-Japan1-UCS2']) {
+		const expected = fs.readFileSync(path.join(source, 'cmaps', `${name}.bcmap`));
+		const actual = slice(cmaps, CMAP_INDEX, name);
+		assert.equal(actual.length, expected.length, `${name} 长度不一致`);
+		assert.deepEqual(Buffer.from(actual), expected, `${name} 内容不一致`);
+	}
+
+	const fonts = await inflate(STANDARD_FONT_PACK_BASE64);
+	for (const name of ['LiberationSans-Regular.ttf', 'FoxitSerif.pfb']) {
+		const expected = fs.readFileSync(path.join(source, 'standard_fonts', name));
+		const actual = slice(fonts, STANDARD_FONT_INDEX, name);
+		assert.deepEqual(Buffer.from(actual), expected, `${name} 内容不一致`);
+	}
 });
 
 test('走自定义工厂能读到未嵌入字体的中文 PDF 文字', async () => {

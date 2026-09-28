@@ -1,13 +1,24 @@
 import * as pdfjs from 'pdfjs-dist/build/pdf.min.mjs';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import workerSource from 'pickme:pdf-worker';
-import { CMAP_BASE64, CMAP_COUNT, STANDARD_FONT_BASE64, STANDARD_FONT_COUNT } from '../generated/pdfAssets.ts';
+import {
+	CMAP_COUNT,
+	CMAP_INDEX,
+	CMAP_PACK_BASE64,
+	STANDARD_FONT_COUNT,
+	STANDARD_FONT_INDEX,
+	STANDARD_FONT_PACK_BASE64,
+} from '../generated/pdfAssets.ts';
 
 let workerUrl: string | null = null;
 
-/** base64 解码一次就缓存住：pdf.js 可能对同一份 CMap 反复取值 */
+/** 切片结果缓存住：pdf.js 可能对同一份 CMap 反复取值 */
 const decodedCmaps = new Map<string, Uint8Array>();
 const decodedFonts = new Map<string, Uint8Array>();
+
+/** 整包解压只做一次，之后所有资源都从这份字节里切 */
+let cmapPack: Promise<Uint8Array> | null = null;
+let fontPack: Promise<Uint8Array> | null = null;
 
 function decodeBase64(text: string): Uint8Array {
 	const binary = atob(text);
@@ -16,17 +27,46 @@ function decodeBase64(text: string): Uint8Array {
 	return bytes;
 }
 
-function lookup(
+/**
+ * 内置资源是「所有文件拼接后整体 gzip」，运行时解压一次。
+ *
+ * 用平台自带的 DecompressionStream（Chromium/Electron 与 Node 都有），
+ * 不引入解压库——插件体积本来就在这个资源包上，能不加依赖就不加。
+ */
+async function inflate(bytes: Uint8Array): Promise<Uint8Array> {
+	if (typeof DecompressionStream !== 'function') {
+		throw new Error('当前环境不支持解压内置的 pdf.js 资源（缺少 DecompressionStream）');
+	}
+	// 断言是必要的：DOM 的 BlobPart 只接受 ArrayBuffer，TS 5.7 起 Uint8Array 的 buffer 类型是 ArrayBufferLike
+	const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new DecompressionStream('gzip'));
+	const buffer = await new Response(stream).arrayBuffer();
+	return new Uint8Array(buffer);
+}
+
+/** 取一份资源：命中缓存就返回，否则解整包（只解一次）再按索引切片 */
+async function lookup(
 	store: Map<string, Uint8Array>,
-	table: Record<string, string>,
+	pack: 'cmap' | 'font',
 	key: string,
 	kind: string,
-): Uint8Array {
+): Promise<Uint8Array> {
 	const cached = store.get(key);
 	if (cached) return cached;
-	const text = table[key];
-	if (!text) throw new Error(`没有内置的${kind}：${key}`);
-	const data = decodeBase64(text);
+
+	const index = pack === 'cmap' ? CMAP_INDEX : STANDARD_FONT_INDEX;
+	const range = index[key];
+	if (!range) throw new Error(`没有内置的${kind}：${key}`);
+
+	let pending: Promise<Uint8Array>;
+	if (pack === 'cmap') {
+		cmapPack ??= inflate(decodeBase64(CMAP_PACK_BASE64));
+		pending = cmapPack;
+	} else {
+		fontPack ??= inflate(decodeBase64(STANDARD_FONT_PACK_BASE64));
+		pending = fontPack;
+	}
+	const whole = await pending;
+	const data = whole.slice(range[0], range[0] + range[1]);
 	store.set(key, data);
 	return data;
 }
@@ -46,7 +86,7 @@ class InlineCMapReaderFactory {
 	}
 
 	async fetch({ name }: { name: string }): Promise<{ cMapData: Uint8Array; isCompressed: boolean }> {
-		return { cMapData: lookup(decodedCmaps, CMAP_BASE64, String(name), ' CMap'), isCompressed: true };
+		return { cMapData: await lookup(decodedCmaps, 'cmap', String(name), ' CMap'), isCompressed: true };
 	}
 }
 
@@ -58,7 +98,7 @@ class InlineStandardFontDataFactory {
 	}
 
 	async fetch({ filename }: { filename: string }): Promise<Uint8Array> {
-		return lookup(decodedFonts, STANDARD_FONT_BASE64, String(filename), '标准字体');
+		return lookup(decodedFonts, 'font', String(filename), '标准字体');
 	}
 }
 
