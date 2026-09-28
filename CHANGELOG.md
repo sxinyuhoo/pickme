@@ -2,6 +2,13 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.0.8
+
+### Changed
+
+- **The pointer tells you which mode you are in.** Region mode keeps the crosshair; highlighter mode uses a marker cursor (with a text-cursor fallback where custom cursors are unavailable), so you can see which tool is live before you press the button.
+- **The active annotation mode is now clearly marked on the toolbar**: the selected button gets an accent background and outline, instead of relying on a slightly different icon shade. Screen readers get `aria-pressed` as well.
+
 ## 1.0.7
 
 ### Changed

@@ -314,6 +314,17 @@ body.pickme-mark-border .pickme-mark {
 	color: var(--text-accent);
 }
 
+/* 当前选中的标注方式：底色 + 描边都上强调色，别只靠图标深浅 */
+.pickme-pdf-mode.is-active {
+	background: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+	color: var(--text-accent);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 60%, transparent);
+}
+
+.pickme-pdf-mode.is-active:hover {
+	background: color-mix(in srgb, var(--interactive-accent) 28%, transparent);
+}
+
 .pickme-icon-button.is-off {
 	color: var(--text-faint);
 }
@@ -530,6 +541,12 @@ body.pickme-mark-border .pickme-mark {
 	position: absolute;
 	inset: 0;
 	cursor: crosshair;
+}
+
+/* 两种标注方式的指针要能一眼分辨：框选是十字，荧光笔是笔刷（热区在笔尖）。
+   自定义光标不可用的环境退回文本光标——也比十字更贴近「划文字」这件事。 */
+.pickme-pdf-sheet.is-mode-highlight .pickme-pdf-overlay {
+	cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M5.4 18.6l1.9-3.2 8.4-8.4 2.8 2.8-8.4 8.4z' fill='%23ffd54a' stroke='%23222' stroke-width='1.1' stroke-linejoin='round'/><path d='M2.6 21.4h18.8' stroke='%2398cbed' stroke-width='2.8' stroke-linecap='round'/><path d='M16.6 6.1l1.5-1.5a1.5 1.5 0 0 1 2.2 2.2l-1.5 1.5z' fill='%23c9ced6' stroke='%23222' stroke-width='1.1' stroke-linejoin='round'/></svg>") 4 20, text;
 }
 
 .pickme-pdf-marquee {

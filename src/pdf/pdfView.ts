@@ -587,6 +587,8 @@ export class PickmePdfView extends FileView {
 			const base = sizes[index - 1] ?? [595, 842];
 			const sheet = stage.createDiv({ cls: 'pickme-pdf-sheet' });
 			sheet.setAttribute('data-page', String(index));
+			// 指针样式随标注方式走（笔刷 / 十字），具体在 styles.css 里按这个类切
+			sheet.toggleClass('is-mode-highlight', this.plugin.settings.pdfAnnotateMode === 'highlight');
 			const canvas = sheet.createEl('canvas', { cls: 'pickme-pdf-canvas' });
 			const overlay = sheet.createDiv({ cls: 'pickme-pdf-overlay' });
 			const marquee = overlay.createDiv({ cls: 'pickme-pdf-marquee' });
@@ -1160,6 +1162,10 @@ export class PickmePdfView extends FileView {
 		const mode = this.plugin.settings.pdfAnnotateMode;
 		this.highlighterButton?.toggleClass('is-active', mode === 'highlight');
 		this.areaButton?.toggleClass('is-active', mode === 'area');
+		this.highlighterButton?.setAttribute('aria-pressed', String(mode === 'highlight'));
+		this.areaButton?.setAttribute('aria-pressed', String(mode === 'area'));
+		// 页面上跟着换指针：荧光笔是笔刷，框选是十字
+		for (const slot of this.slots) slot.sheet.toggleClass('is-mode-highlight', mode === 'highlight');
 	}
 
 	/** 正在读的那条批注完整显形，同页其它批注退到背景（样式见 styles.css 的 is-active） */
