@@ -13,7 +13,7 @@ Select text in a note, or drag a rectangle over a PDF page, and a panel opens ri
 | ![Select text in a note, the panel opens next to it](docs/screenshots/01-select-text-then-ask.png) | ![The answer appears in the panel and is saved to the annotation file](docs/screenshots/02-answer-in-panel.png) |
 | ![Drag a rectangle over a PDF page](docs/screenshots/03-pdf-region-annotate.png) | ![The annotation index, grouped by source document](docs/screenshots/04-annotation-index.png) |
 
-In a PDF you can annotate two ways, and the toolbar switches between them: drag a **rectangle** over a region (its text and a screenshot go to the model together), or drag a **highlighter stroke** across text — the stroke snaps to the lines underneath and renders as a clean band, however shaky your hand was. The two can be combined on the same annotation.
+In a PDF you can annotate two ways, and the toolbar switches between them: drag a **rectangle** over a region (its text and a screenshot go to the model together), or drag a **highlighter stroke** across text — the stroke snaps to the lines underneath and renders as a clean band, however shaky your hand was. The two have distinct jobs: the **highlighter only highlights** — the stroke stops at the band and no panel opens (click the highlight when you do want to ask about that passage) — while a **rectangle** opens the ask panel the moment you finish it. The two can be combined on the same annotation.
 
 Drag a rectangle over a PDF page — the text of that region and its screenshot go to the model together, and the box stays on the page to reopen later:
 

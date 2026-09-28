@@ -230,6 +230,8 @@ export class PickmePdfView extends FileView {
 		if (!file) return;
 		this.panelSeq += 1;
 		const seq = this.panelSeq;
+		// 面板一开就说明用户已经在这条上干活了，Esc 不再收回它
+		this.freshHighlight = null;
 		this.panelEntryId = entryId;
 		this.panelAnchorSlot = anchorSlot ?? null;
 		this.panelAnchorRect = screenRect ?? null;
@@ -901,6 +903,15 @@ export class PickmePdfView extends FileView {
 				const active = document.activeElement;
 				if (isEditableElement(active)) return;
 				if (active && active !== document.body && !this.containerEl.contains(active)) return;
+				// Esc 收回刚划的高亮（面板开着时 Esc 归面板：关闭面板）
+				const fresh = this.freshHighlight;
+				if (event.key === 'Escape') {
+					if (!this.panelEntryId && fresh && Date.now() - fresh.at < 15000) {
+						this.freshHighlight = null;
+						void this.undoFreshHighlight(fresh);
+					}
+					return;
+				}
 				const scroll = this.scrollEl;
 				// 放大到横向要滚动时，左右键留给原生滚动
 				if (scroll && scroll.scrollWidth > scroll.clientWidth + 1) return;
@@ -1233,7 +1244,7 @@ export class PickmePdfView extends FileView {
 		];
 		const hitText = linesText(lines);
 		const preview = hitText.replace(/\s+/g, ' ').slice(0, 40);
-		this.setStatus(t('已批注：{v0}', { v0: preview }));
+		this.setStatus(t('已高亮：{v0}（Esc 撤销）', { v0: preview }));
 
 		const id = newAnchorId();
 		const entry: AnnotationEntry = {
@@ -1260,15 +1271,25 @@ export class PickmePdfView extends FileView {
 
 		await this.plugin.repository.addEntry(file, entry);
 		await this.drawMarksFor(slot);
-		const screenRect = this.lineScreenRect(slot, { rect: box, items: [] });
+		// 荧光笔的语义就是「高亮」本身：不弹提问面板，也不跳侧边栏。
+		// 想就这一段问点什么，点一下这条高亮即可（和点已有批注是同一条路）。
+		// 记下它只是为了刚划完的十几秒里能用 Esc 收回一次笔误。
+		this.freshHighlight = { id, slot, at: Date.now() };
+	}
 
-		if (this.plugin.settings.inlineAsk) {
-			this.openAskPanel(id, slot, screenRect, true);
-		} else {
-			const sidebar = await this.plugin.openSidebar();
-			await sidebar.setFile(file);
-			sidebar.setActiveEntry(id);
-		}
+	/** 刚划完的那条高亮：只为 Esc 撤销而记，过了时间窗或已被问过就不动它 */
+	private freshHighlight: { id: string; slot: PageSlot; at: number } | null = null;
+
+	/** Esc 撤销刚划的高亮。只认「刚划且没问过」的那条，绝不碰旧批注 */
+	private async undoFreshHighlight(fresh: { id: string; slot: PageSlot }): Promise<void> {
+		const file = this.file;
+		if (!file) return;
+		const { doc } = await this.plugin.repository.loadFor(file);
+		const entry = doc.entries.find((item) => item.id === fresh.id);
+		if (!entry || entry.qas.length) return;
+		await this.plugin.deleteEntry(fresh.id, file);
+		await this.drawMarksFor(fresh.slot);
+		this.setStatus(t('已撤销这次高亮'));
 	}
 
 	/** 把框选区域从这一页的画布上裁下来存成 PNG */

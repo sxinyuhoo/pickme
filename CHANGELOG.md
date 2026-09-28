@@ -2,6 +2,14 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.0.7
+
+### Changed
+
+- **The highlighter only highlights.** Finishing a stroke no longer opens the ask panel or jumps to the sidebar - the stroke snaps to the line and stops there, because the point of a highlighter is the mark itself. To ask about a passage you highlighted, click it: the panel opens the same way it does for any existing annotation.
+- Pressing `Escape` within a few seconds of a stroke undoes that highlight, which keeps a mis-aimed stroke from having to be deleted through the panel.
+- Region mode is unchanged: drag a box and the panel opens right away.
+
 ## 1.0.6
 
 ### Added

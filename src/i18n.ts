@@ -137,6 +137,8 @@ export const EN: Record<string, string> = {
 	'左边框': 'Left border',
 	'已完成': 'Done',
 	'已批注一块区域，可直接在面板里提问': 'Area annotated; you can ask in the panel',
+	'已高亮：{v0}（Esc 撤销）': 'Highlighted: {v0} (Esc to undo)',
+	'已撤销这次高亮': 'Highlight undone',
 	'已批注：{v0}': 'Annotated: {v0}',
 	'已结束，可继续提问': 'Finished, you can keep asking',
 	'已选中一块区域（未取到文字）': 'Area selected (no text found)',
