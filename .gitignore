@@ -3,8 +3,10 @@ main.js
 *.js.map
 .DS_Store
 
-# 构建中间产物（由 scripts/inline-pdf-assets.mjs 生成）
-src/generated/
+# src/generated/pdfAssets.ts 由 scripts/inline-pdf-assets.mjs 生成，但要**提交进仓库**：
+# 官方扫描器与编辑器/CI 都看不到未提交的模块，import 解析不出来会退化成 any，
+# 报告里就冒出 10 条 unsafe-* 假阳性（本地复现确认过）。生成是确定性的，
+# 跑 npm run assets 不产生 diff，CI 里有一道检查守着它不跟 pdfjs-dist 漂移。
 
 # 运行期数据：开发期库里的插件目录是软链到本仓库的，
 # 插件自管的东西会直接落在仓库里 —— 这些绝不能提交。

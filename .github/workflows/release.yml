@@ -28,6 +28,15 @@ jobs:
           npm ci
           npm run build
 
+      - name: Check generated assets are committed and up to date
+        run: |
+          # 生成文件是提交进仓库的（扫描器要能解析它，否则会出 unsafe-* 假阳性）。
+          # npm run build 已经重新生成过一次，这里守住它没有跟 pdfjs-dist 漂移。
+          if ! git diff --exit-code -- src/generated; then
+            echo "src/generated 与仓库里的版本不一致：本地跑 npm run assets 后一并提交" >&2
+            exit 1
+          fi
+
       - name: Check versions match
         run: |
           tag="${GITHUB_REF#refs/tags/}"

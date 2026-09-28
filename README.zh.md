@@ -243,7 +243,7 @@ src/render/   阅读视图后处理器、实时预览装饰器
 src/pdf/      pdf.js 载入与自带查看器
 src/ui/       侧边栏、弹窗
 scripts/      构建与验证脚本（内联 pdf.js 资源、安装到库、冒烟）
-src/generated/内联的 pdf.js CMap 与标准字体（构建时生成，不入版本库）
+src/generated/内联的 pdf.js CMap 与标准字体（由 scripts/inline-pdf-assets.mjs 生成，确定性产物，随源码一起提交）
 ```
 
 ## 验收标准怎么自测

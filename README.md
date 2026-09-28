@@ -127,6 +127,8 @@ node scripts/install.mjs "/path/to/vault" --copy   # copy the built files instea
 
 The repository ships the plugin source and build scripts only. Design and acceptance documents stay in the private development repository.
 
+`src/generated/pdfAssets.ts` (pdf.js CMap tables and standard fonts, ~1.8 MB of base64) **is committed on purpose**: static analysis and type checking have to resolve it, and an unresolved import degrades to `any`, which shows up as spurious `unsafe-*` findings in the plugin review. Regeneration is deterministic, and CI fails if it drifts from `pdfjs-dist`.
+
 ## License and third-party components
 
 - This plugin: MIT, see [LICENSE](./LICENSE).
