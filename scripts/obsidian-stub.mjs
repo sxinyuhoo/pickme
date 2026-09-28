@@ -79,6 +79,17 @@ export function createObsidianStub() {
 				mkdir: async (p) => {
 					this.folders.add(norm(p));
 				},
+				// 与真实 Obsidian 一致：recursive 为 false 时目录非空就抛错
+				rmdir: async (p, recursive = false) => {
+					const key = norm(p);
+					if (!this.folders.has(key)) return;
+					const prefix = key ? `${key}/` : '';
+					const hasChild = [...this.files.keys()].some((f) => f.startsWith(prefix))
+						|| [...this.folders].some((f) => f !== key && f.startsWith(prefix));
+					if (hasChild && !recursive) throw new Error('Directory not empty');
+					if (!key) return;
+					this.folders.delete(key);
+				},
 			};
 			this.configDir = '.obsidian';
 		}

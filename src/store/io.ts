@@ -186,6 +186,26 @@ export class FileIO {
 		return out;
 	}
 
+	/**
+	 * 删掉一个已经空了的目录，只删这一层、绝不递归。
+	 *
+	 * 批注删除后配套的 `_assets/<文档名>.md/` 会空出来，不收拾就会在批注目录里
+	 * 留下空文件夹（批注目录设到库内时用户能直接看到）。非空、不存在都由它去，
+	 * 调用方不必先判断。
+	 */
+	async pruneEmptyFolder(dir: string): Promise<void> {
+		const clean = normalizePath(dir).replace(/^\/+|\/+$/g, '');
+		if (!clean) return;
+		try {
+			if (!(await this.dirExists(clean))) return;
+			const listed = await this.app.vault.adapter.list(clean);
+			if (listed.files.length > 0 || listed.folders.length > 0) return;
+			await this.app.vault.adapter.rmdir(clean, false);
+		} catch {
+			// 还有东西、或已被别处删掉，都不算错
+		}
+	}
+
 	/** 图片可用的 url：索引内用库的资源路径，配置目录内用 blob */
 	async resourceUrl(path: string): Promise<string | null> {
 		if (this.isIndexed(path)) {

@@ -155,6 +155,8 @@ export class AnnotationRepository {
 		}
 		if (entry.pdf?.image) {
 			await this.io.remove(entry.pdf.image);
+			// 最后一张图删掉后 _assets/<文档>.md/ 就空了，顺手收掉，别留空文件夹
+			await this.io.pruneEmptyFolder(entry.pdf.image.split('/').slice(0, -1).join('/'));
 		}
 
 		if (doc.entries.length === 0 && filePath) {

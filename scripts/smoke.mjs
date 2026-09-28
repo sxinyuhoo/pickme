@@ -1283,4 +1283,37 @@ console.log('测试连接检查通过（fetch 被拦时自动回退，不再报 
 	console.log('默认目录解析检查通过（不写死 .obsidian 路径）');
 }
 
+// ---------- 13 删除 PDF 批注要把配套的 _assets 目录一起收掉（只删空的，不递归） ----------
+const tidyPdf = await vault.create('标准/空目录检查.pdf', '%PDF-1.4 fake');
+const tidyDir = '30-批注/_assets/空目录检查.pdf.md';
+await vault.adapter.mkdir(tidyDir);
+const makePdfEntry = (id, image) => ({
+	id,
+	kind: 'pdf',
+	selection: '',
+	fingerprint: 'aabbccdd',
+	status: 'ok',
+	created: '2026-09-24T21:00:00+08:00',
+	qas: [],
+	pdf: {
+		page: 1,
+		pageSize: [595, 842],
+		rect: [10, 20, 30, 40],
+		normRect: [0.01, 0.02, 0.03, 0.04],
+		hitText: '样例',
+		image,
+	},
+});
+await plugin.repository.addEntry(tidyPdf, makePdfEntry('t1aaaa', `${tidyDir}/1.png`));
+await plugin.repository.addEntry(tidyPdf, makePdfEntry('t2bbbb', `${tidyDir}/2.png`));
+await vault.create(`${tidyDir}/1.png`, 'png-1');
+await vault.create(`${tidyDir}/2.png`, 'png-2');
+
+await plugin.repository.deleteEntry(tidyPdf, 't1aaaa');
+assert.equal(vault.folders.has(tidyDir), true, '同一份 PDF 还有别的图时，_assets 目录不能被删掉');
+await plugin.repository.deleteEntry(tidyPdf, 't2bbbb');
+assert.equal(vault.files.has(`${tidyDir}/1.png`), false, '批注删掉后区域截图应当一并清理');
+assert.equal(vault.folders.has(tidyDir), false, '最后一张图删掉后，空的 _assets 目录应当被收掉');
+console.log('空 _assets 目录清理检查通过（只删空目录，还有图时不删）');
+
 console.log('\n全部冒烟检查通过。');
