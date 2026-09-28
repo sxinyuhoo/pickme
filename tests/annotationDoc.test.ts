@@ -5,7 +5,30 @@ import {
 	parseAnnotationDoc,
 	renderAnnotationDoc,
 } from '../src/core/annotationDoc.ts';
-import type { AnnotationDoc } from '../src/core/types.ts';
+import { shapesOf } from '../src/core/types.ts';
+import type { AnnotationDoc, AnnotationEntry, PdfAnchorInfo, PdfShape } from '../src/core/types.ts';
+
+/** 造一条 PDF 批注，默认是「只有外接矩形、没有 shapes」的老形态 */
+function pdfEntry(pdf: Partial<PdfAnchorInfo>): AnnotationEntry {
+	return {
+		id: 's1a2b3',
+		kind: 'pdf',
+		selection: '',
+		fingerprint: 'c0ffee00',
+		status: 'ok',
+		created: '2026-09-28T10:00:00+08:00',
+		qas: [],
+		pdf: {
+			page: 3,
+			pageSize: [595, 842],
+			rect: [100, 182, 300, 260],
+			normRect: [0.1681, 0.2162, 0.5042, 0.3088],
+			hitText: '',
+			image: '',
+			...pdf,
+		},
+	};
+}
 
 function sampleDoc(): AnnotationDoc {
 	return {
@@ -130,4 +153,159 @@ test('解析容错：没有 frontmatter 的文件不抛错', () => {
 	assert.equal(parsed.entries.length, 1);
 	assert.equal(parsed.entries[0].selection, '某段话');
 	assert.deepEqual(parsed.entries[0].qas, []);
+});
+
+test('框+线复合批注：形状集合、颜色、旋转往返后逐项相等', () => {
+	const doc = sampleDoc();
+	const shapes: PdfShape[] = [
+		{ kind: 'line', rect: [100, 240, 300, 255], norm: [0.1681, 0.285, 0.5042, 0.3029] },
+		{ kind: 'line', rect: [100, 222, 300, 237], norm: [0.1681, 0.2637, 0.5042, 0.2815] },
+		{ kind: 'line', rect: [100, 204, 300, 219], norm: [0.1681, 0.2423, 0.5042, 0.2601] },
+		{ kind: 'area', rect: [100, 182, 300, 260], norm: [0.1681, 0.2162, 0.5042, 0.3088] },
+	];
+	doc.entries = [
+		pdfEntry({
+			shapes,
+			color: '#98cbed',
+			rotation: 90,
+			hitText: '最大纵坡不应大于 3%',
+		}),
+	];
+
+	const text = renderAnnotationDoc(doc);
+	assert.ok(text.includes('- 形状：框+线'), '复合批注要写「框+线」');
+	assert.ok(text.includes('- 颜色：#98cbed'), '非默认色要落盘');
+	assert.ok(text.includes('- 页面旋转：90'), '非零旋转要落盘');
+	assert.ok(text.includes('- 荧光行：'), '线形状写用户空间荧光行');
+	assert.ok(text.includes('- 框：'), '框形状写用户空间框');
+
+	const parsed = parseAnnotationDoc(text, doc.selfPath);
+	const pdf = parsed.entries[0].pdf;
+	assert.ok(pdf);
+	assert.equal(pdf.shapes?.length, 4);
+	assert.deepEqual(pdf.shapes?.map((s) => s.kind), ['line', 'line', 'line', 'area']);
+	assert.deepEqual(pdf.shapes?.map((s) => s.norm), shapes.map((s) => s.norm));
+	assert.equal(pdf.color, '#98cbed');
+	assert.equal(pdf.rotation, 90);
+	// 解析出的形状集合就是 shapesOf 的结果，业务侧不要再直接读 shapes
+	assert.deepEqual(shapesOf(pdf), pdf.shapes);
+});
+
+test('多行命中文本往返后完整保留（修复只留第一行的缺陷）', () => {
+	const doc = sampleDoc();
+	const hitText = '最大纵坡不应大于 3%，隧道段可放宽至 4%\n二三级公路按 8% 控制\n第四行也要留住';
+	doc.entries = [pdfEntry({ hitText })];
+
+	const text = renderAnnotationDoc(doc);
+	assert.ok(text.includes('### 命中文本'), '完整文字要落成小节');
+	assert.ok(
+		text.includes('- 命中文本：最大纵坡不应大于 3%，隧道段可放宽至 4%'),
+		'bullet 只放单行摘要，且不含后续行',
+	);
+
+	const parsed = parseAnnotationDoc(text, doc.selfPath);
+	assert.equal(parsed.entries[0].pdf?.hitText, hitText);
+	assert.equal(parsed.entries[0].pdf?.hitText.split('\n').length, 3);
+
+	// 空行与长行都不该被吃掉；摘要在 120 字处截断
+	const long = `${'甲'.repeat(200)}\n第二行`;
+	const longDoc = sampleDoc();
+	longDoc.entries = [pdfEntry({ hitText: long })];
+	const longText = renderAnnotationDoc(longDoc);
+	const summary = longText.split('\n').find((line) => line.startsWith('- 命中文本：')) ?? '';
+	assert.equal(summary.length, '- 命中文本：'.length + 120);
+	assert.equal(parseAnnotationDoc(longText, longDoc.selfPath).entries[0].pdf?.hitText, long);
+});
+
+test('老格式文本解析后 shapes 为 undefined，shapesOf 退化成单个框', () => {
+	const old = [
+		'## 锚点 old001',
+		'',
+		'- 类型：PDF 区域',
+		'- 锚点 id：old001',
+		'- 定位指纹：abc123',
+		'- 状态：有效',
+		'- 创建：2026-01-01T00:00:00+08:00',
+		'- 页码：5',
+		'- 页面尺寸：595x842',
+		'- 矩形：100,200,300,260',
+		'- 归一化矩形：0.1681,0.2375,0.5042,0.3088',
+		'- 命中文本：只有一行的老批注',
+		'',
+	].join('\n');
+
+	const parsed = parseAnnotationDoc(old, 'x.md');
+	const pdf = parsed.entries[0].pdf;
+	assert.ok(pdf);
+	assert.equal(pdf.shapes, undefined, '没有新字段时不该造出 shapes');
+	assert.equal(pdf.color, undefined);
+	assert.equal(pdf.rotation, undefined);
+	assert.equal(pdf.hitText, '只有一行的老批注');
+
+	const shapes = shapesOf(pdf);
+	assert.equal(shapes.length, 1);
+	assert.equal(shapes[0].kind, 'area');
+	assert.deepEqual(shapes[0].norm, [0.1681, 0.2375, 0.5042, 0.3088]);
+	assert.deepEqual(shapes[0].rect, [100, 200, 300, 260]);
+});
+
+test('只有线形状的批注，形状字段写「线」', () => {
+	const doc = sampleDoc();
+	doc.entries = [
+		pdfEntry({
+			shapes: [
+				{ kind: 'line', rect: [100, 240, 300, 255], norm: [0.1681, 0.285, 0.5042, 0.3029] },
+				{ kind: 'line', rect: [100, 222, 300, 237], norm: [0.1681, 0.2637, 0.5042, 0.2815] },
+			],
+		}),
+	];
+
+	const text = renderAnnotationDoc(doc);
+	assert.ok(text.includes('- 形状：线'), '纯荧光笔批注写「线」');
+	assert.ok(text.includes('- 归一化荧光行：'));
+	assert.ok(!text.includes('- 框：'), '没有框形状时不该写「框」');
+	assert.ok(!text.includes('- 归一化框：'));
+
+	const parsed = parseAnnotationDoc(text, doc.selfPath);
+	assert.deepEqual(parsed.entries[0].pdf?.shapes?.map((s) => s.kind), ['line', 'line']);
+});
+
+test('解析容错：坏掉的坐标片段跳过，形状字段缺失时回退到用户空间', () => {
+	// 归一化字段整段毁掉 → 应当用「荧光行」按页面尺寸换算回来
+	const fallback = parseAnnotationDoc(
+		[
+			'## 锚点 f001',
+			'',
+			'- 类型：PDF 区域',
+			'- 形状：线',
+			'- 页面尺寸：595x842',
+			'- 矩形：100,200,300,260',
+			'- 归一化矩形：0.1681,0.2375,0.5042,0.3088',
+			'- 荧光行：119,210.5,238,421',
+			'- 归一化荧光行：garbage',
+			'',
+		].join('\n'),
+		'x.md',
+	);
+	const shapes = fallback.entries[0].pdf?.shapes ?? [];
+	assert.equal(shapes.length, 1);
+	assert.equal(shapes[0].kind, 'line');
+	assert.deepEqual(shapes[0].norm, [0.2, 0.25, 0.4, 0.5]);
+
+	// 坐标片段坏一个只丢那一个，其余照常解析
+	const partial = parseAnnotationDoc(
+		[
+			'## 锚点 f002',
+			'',
+			'- 类型：PDF 区域',
+			'- 页面尺寸：100x100',
+			'- 归一化荧光行：0.1,0.2,0.3,0.4;坏;0.5,0.6,0.7,0.8',
+			'',
+		].join('\n'),
+		'x.md',
+	);
+	assert.deepEqual(partial.entries[0].pdf?.shapes?.map((s) => s.norm), [
+		[0.1, 0.2, 0.3, 0.4],
+		[0.5, 0.6, 0.7, 0.8],
+	]);
 });

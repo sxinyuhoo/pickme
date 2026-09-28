@@ -411,12 +411,103 @@ console.log('PDF 批注检查通过（页码、矩形、归一化矩形、命中
 const pdfIndex = await plugin.repository.buildIndex(plugin.indexFilePath());
 assert.equal(pdfIndex.rows, 1, `索引应有 1 行（PDF 批注），实际 ${pdfIndex.rows}`);
 const pdfIndexText = vault.files.get(plugin.indexFilePath()).content;
-assert.ok(pdfIndexText.includes('第 12 页区域'), '索引应标明 PDF 页码');
+assert.ok(pdfIndexText.includes('第 12 页框选'), '索引应标明 PDF 页码与形状');
 assert.ok(
 	pdfIndexText.includes('[[公路路线设计规范.pdf]]'),
 	'索引应回指 PDF 源文件（保留 .pdf 后缀才是可点的双链）',
 );
 console.log('索引含 PDF 批注检查通过');
+
+// 5.6 荧光笔批注：多行形状落盘、不截图、多行命中文本完整保留
+const strokeEntry = {
+	id: 's1k9w2',
+	kind: 'pdf',
+	selection: '',
+	fingerprint: 'a1b2c3d4',
+	status: 'ok',
+	created: '2026-09-28T10:00:00+08:00',
+	qas: [],
+	pdf: {
+		page: 12,
+		pageSize: [595, 842],
+		rect: [100, 200, 300, 260],
+		normRect: [0.1681, 0.2375, 0.5042, 0.3088],
+		shapes: [
+			{ kind: 'line', rect: [100, 240, 300, 260], norm: [0.1681, 0.285, 0.5042, 0.3088] },
+			{ kind: 'line', rect: [100, 200, 220, 220], norm: [0.1681, 0.2375, 0.3697, 0.2613] },
+		],
+		hitText: '最大纵坡不应大于 3%\n隧道段可放宽至 4%',
+		image: '',
+	},
+};
+await plugin.repository.addEntry(pdfSource, strokeEntry);
+const strokeSidecar = vault.files.get(pdfSidecarPath);
+for (const expected of [
+	'形状：线',
+	'归一化荧光行：0.1681,0.2850,0.5042,0.3088;0.1681,0.2375,0.3697,0.2613',
+	'- 命中文本：最大纵坡不应大于 3%',
+	'### 命中文本',
+	'隧道段可放宽至 4%',
+]) {
+	assert.ok(strokeSidecar.content.includes(expected), `荧光笔批注文件缺少：${expected}`);
+}
+const strokeBlock = strokeSidecar.content.slice(strokeSidecar.content.indexOf('## 锚点 s1k9w2'));
+assert.ok(!strokeBlock.includes('![['), '荧光笔是文字批注，不该带区域截图');
+
+// 往返：形状数与多行命中文本都要原样回来
+const strokeReloaded = await plugin.repository.loadFor(pdfSource);
+const strokeBack = strokeReloaded.doc.entries.find((entry) => entry.id === 's1k9w2');
+assert.equal(strokeBack.pdf.shapes.length, 2, '两条荧光行应当都回来');
+assert.deepEqual(strokeBack.pdf.shapes[1].norm, [0.1681, 0.2375, 0.3697, 0.2613]);
+assert.ok(strokeBack.pdf.hitText.includes('\n'), '多行命中文本不能丢行');
+assert.ok(strokeBack.pdf.hitText.includes('隧道段可放宽至 4%'), '第二行文字要保住');
+assert.equal(strokeBack.pdf.image, '', '荧光笔批注不存截图');
+
+// 老批注照旧能读：没有 shapes 字段时退化成它自己那一个框，两种读法必须给出同一块区域
+const legacyBack = strokeReloaded.doc.entries.find((entry) => entry.id === 'm1p8x4');
+const legacyShapes =
+	legacyBack.pdf.shapes ?? [{ kind: 'area', rect: legacyBack.pdf.rect, norm: legacyBack.pdf.normRect }];
+assert.equal(legacyShapes.length, 1, '老批注只应该有一个框');
+assert.deepEqual(legacyShapes[0].kind, 'area');
+assert.deepEqual(legacyShapes[0].norm, [0.1681, 0.2375, 0.5042, 0.3088], '老批注的位置不能动');
+assert.deepEqual(legacyBack.pdf.normRect, [0.1681, 0.2375, 0.5042, 0.3088], '老批注的归一化矩形不能动');
+
+// 框＋线叠加在同一条批注上
+const mixedEntry = {
+	id: 'm2x7q5',
+	kind: 'pdf',
+	selection: '',
+	fingerprint: 'd5c4b3a2',
+	status: 'ok',
+	created: '2026-09-28T10:05:00+08:00',
+	qas: [],
+	pdf: {
+		page: 12,
+		pageSize: [595, 842],
+		rect: [80, 200, 300, 300],
+		normRect: [0.1345, 0.2375, 0.5042, 0.3563],
+		shapes: [
+			{ kind: 'area', rect: [80, 200, 300, 300], norm: [0.1345, 0.2375, 0.5042, 0.3563] },
+			{ kind: 'line', rect: [100, 240, 300, 260], norm: [0.1681, 0.285, 0.5042, 0.3088] },
+		],
+		hitText: '最大纵坡不应大于 3%',
+		image: '',
+	},
+};
+await plugin.repository.addEntry(pdfSource, mixedEntry);
+const mixedReloaded = await plugin.repository.loadFor(pdfSource);
+const mixedBack = mixedReloaded.doc.entries.find((entry) => entry.id === 'm2x7q5');
+assert.equal(mixedBack.pdf.shapes.length, 2, '框＋线应当是两个形状');
+assert.deepEqual(
+	[...new Set(mixedBack.pdf.shapes.map((shape) => shape.kind))].sort(),
+	['area', 'line'],
+	'框与线都要在（渲染顺序由解析侧决定，不影响几何）',
+);
+assert.ok(
+	vault.files.get(pdfSidecarPath).content.includes('形状：框+线'),
+	'框＋线的批注要在文件里标明两种形状',
+);
+console.log('荧光笔批注检查通过（多行形状、不截图、多行文字完整、老批注兼容、框＋线叠加）');
 
 // 6 模板补齐
 const templateNames = await plugin.templates.list();

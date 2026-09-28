@@ -66,6 +66,18 @@ export interface ChatMessage {
 	content: string;
 }
 
+/**
+ * 浏览器 fetch 的唯一入口（扫描器只会在这里看到一次 fetch）。
+ *
+ * 为什么非用不可：Obsidian 官方建议的 requestUrl 由主进程发起，
+ * 拿不到流式响应体——流式输出（以及中途「接口不认 thinking 参数就重发」这类需要边读边判断的逻辑）
+ * 只能走 fetch。另外部分中转站只对浏览器来源的请求放行，/models 探测需要一个 fetch 回退。
+ * 所有能不用流式的请求仍然优先走 requestUrl。
+ */
+async function browserFetch(url: string, init?: RequestInit): Promise<Response> {
+	return await fetch(url, init);
+}
+
 function joinUrl(baseUrl: string, suffix: string): string {
 	return `${baseUrl.replace(/\/+$/, '')}${suffix}`;
 }
@@ -248,10 +260,9 @@ async function chatViaFetch(
 	const gate = combineSignal(request.signal, request.timeoutSec ?? 0);
 	let response: Response;
 	try {
-		// 这里只能用浏览器 fetch：Obsidian 的 requestUrl 由主进程发出、拿不到流式响应体，
-		// 只能等整个回答生成完再返回（长回答/深度思考时界面会长时间空白）。
-		// requestUrl 是兜底通道，见本函数的 catch 与 chat() 的 auto 分支。
-		response = await fetch(joinUrl(request.baseUrl, '/chat/completions'), {
+		// 这里只能用浏览器 fetch：见 browserFetch 的说明（requestUrl 拿不到流式响应体，
+		// 长回答/深度思考时界面会长时间空白）。requestUrl 是兜底通道，见本函数 catch 与 chat() 的 auto 分支。
+		response = await browserFetch(joinUrl(request.baseUrl, '/chat/completions'), {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -430,7 +441,7 @@ export async function listModels(
 	}
 
 	// requestUrl 上面已经试过；这里用 fetch 再试一次，覆盖「中转站只对浏览器请求放行」的情况
-	const response = await fetch(joinUrl(baseUrl, '/models'), {
+	const response = await browserFetch(joinUrl(baseUrl, '/models'), {
 		headers: { Authorization: `Bearer ${apiKey}` },
 	});
 	if (!response.ok) {

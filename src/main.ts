@@ -132,6 +132,8 @@ export default class PickmePlugin extends Plugin {
 	}
 
 	onunload(): void {
+		// 滚动记忆是节流落盘的，退出前补一次，别把最后几页的进度丢了
+		this.flushSettingsSave();
 		// 卸载时把标记样式类摘掉，别留在 body 上
 		document.body.removeClass(
 			'pickme-mark-background',
@@ -1070,6 +1072,40 @@ export default class PickmePlugin extends Plugin {
 			const message = error instanceof Error ? error.message : String(error);
 			new Notice(t('pickme：连接失败 {v0}', { v0: message }));
 		}
+	}
+
+	/**
+	 * 记住某个 PDF 读到第几页。滚动时调用很频繁，所以内存里立刻更新、落盘节流：
+	 * 一个文件在设置里只占一行，超过 200 个文件就按「最久没读」丢掉。
+	 */
+	rememberPdfPage(path: string, page: number): void {
+		const map = this.settings.pdfLastPage;
+		if (map[path] === page) return;
+		// 先删再写，让这个键移到队尾：对象键按插入顺序，淘汰时丢队首就是丢最久没读的
+		if (path in map) delete map[path];
+		map[path] = page;
+		const keys = Object.keys(map);
+		if (keys.length > 200) for (const key of keys.slice(0, keys.length - 200)) delete map[key];
+		this.scheduleSettingsSave();
+	}
+
+	/** 节流的设置落盘：1.2 秒内的多次改动合成一次写盘 */
+	private settingsSaveTimer: number | null = null;
+
+	private scheduleSettingsSave(): void {
+		if (this.settingsSaveTimer !== null) return;
+		this.settingsSaveTimer = window.setTimeout(() => {
+			this.settingsSaveTimer = null;
+			void this.saveSettings();
+		}, 1200);
+	}
+
+	/** 退出前把还没落盘的设置写掉 */
+	flushSettingsSave(): void {
+		if (this.settingsSaveTimer === null) return;
+		window.clearTimeout(this.settingsSaveTimer);
+		this.settingsSaveTimer = null;
+		void this.saveSettings();
 	}
 
 	/** 供命令与侧边栏读取当前文档的批注 */

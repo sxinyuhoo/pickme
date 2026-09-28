@@ -1,5 +1,6 @@
 import { App, SuggestModal } from 'obsidian';
 import { t } from '../i18n.ts';
+import { shapeKindLabel } from '../core/types.ts';
 import type { AnnotationEntry } from '../core/types.ts';
 
 interface AnchorChoice {
@@ -32,7 +33,10 @@ export class AnchorSuggestModal extends SuggestModal<AnchorChoice> {
 
 	renderSuggestion(choice: AnchorChoice, el: HTMLElement): void {
 		el.createDiv({ text: `${choice.entry.id} ${choice.source}` });
-		const preview = choice.entry.kind === 'pdf' ? `第 ${choice.entry.pdf?.page ?? '?'} 页区域` : choice.entry.selection;
+		const preview =
+			choice.entry.kind === 'pdf' && choice.entry.pdf
+				? `第 ${choice.entry.pdf.page} 页${shapeKindLabel(choice.entry.pdf)}`
+				: choice.entry.selection;
 		el.createDiv({ text: preview.slice(0, 80), cls: 'pickme-suggest-preview' });
 	}
 

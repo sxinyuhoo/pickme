@@ -2,9 +2,17 @@ import { ItemView, Notice, setIcon, TFile, WorkspaceLeaf } from 'obsidian';
 import { t } from '../i18n.ts';
 import type PickmePlugin from '../main.ts';
 import type { IndexGroup } from '../store/repository.ts';
+import { shapeKindLabel } from '../core/types.ts';
 import type { AnnotationEntry } from '../core/types.ts';
 
 export const VIEW_TYPE_PICKME_INDEX = 'pickme-index-view';
+
+/** 形状短称：这里静态写 t()，i18n 覆盖测试才认得出这几个词 */
+function shapeWord(entry: AnnotationEntry): string {
+	const kind = entry.pdf ? shapeKindLabel(entry.pdf) : '框选';
+	if (kind === '框+线') return t('框+线');
+	return kind === '荧光' ? t('荧光') : t('框选');
+}
 
 /**
  * 批注索引：把全部文档的批注集中在一个侧边栏里看。
@@ -195,7 +203,9 @@ export class PickmeIndexView extends ItemView {
 
 		const body = row.createDiv({ cls: 'pickme-index-body' });
 		const what =
-			entry.kind === 'pdf' ? t('第 {v0} 页区域', { v0: entry.pdf?.page ?? '?' }) : entry.selection;
+			entry.kind === 'pdf' && entry.pdf
+				? t('第 {v0} 页 · {v1}', { v0: entry.pdf.page, v1: shapeWord(entry) })
+				: entry.selection;
 		body.createDiv({ cls: 'pickme-index-what', text: shorten(what, 48) });
 		const meta = body.createDiv({ cls: 'pickme-index-meta' });
 		if (stale) meta.createSpan({ cls: 'pickme-index-warn', text: t('失效') });

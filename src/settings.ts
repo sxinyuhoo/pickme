@@ -3,6 +3,7 @@ import { LANGUAGE_LABELS, setLanguage, t } from './i18n.ts';
 import type { Language } from './i18n.ts';
 import type PickmePlugin from './main.ts';
 import type { ChatTransport } from './model/client.ts';
+import type { PdfAnnotateMode } from './core/types.ts';
 import { DEFAULT_TAG } from './core/anchor.ts';
 import { ConfirmModal } from './ui/confirmModal.ts';
 
@@ -41,10 +42,14 @@ export interface PickmeSettings {
 	hiddenTemplates: string[];
 	/** 用自带 pdf.js 查看器接管 PDF 打开 */
 	pdfViewerEnabled: boolean;
+	/** 每个 PDF 上次读到第几页，按文件路径记，重开时回到原处 */
+	pdfLastPage: Record<string, number>;
 	/** 目录面板开着没有（有目录的 PDF 才显示这个开关） */
 	pdfTocOpen: boolean;
 	/** PDF 页面上是否画出已有批注的高亮框（关掉就是原始 PDF 的样子） */
 	showMarks: boolean;
+	/** PDF 标注方式：荧光笔（拖一笔吸附到文字行）还是框选 */
+	pdfAnnotateMode: PdfAnnotateMode;
 	/** 框选时保存区域截图 */
 	pdfSaveScreenshot: boolean;
 	/** 区域截图的最大边长，0 表示不限制 */
@@ -98,8 +103,10 @@ export const DEFAULT_SETTINGS: PickmeSettings = {
 	autoEnsureTemplates: true,
 	hiddenTemplates: [],
 	pdfViewerEnabled: true,
+	pdfLastPage: {},
 	pdfTocOpen: true,
 	showMarks: true,
+	pdfAnnotateMode: 'highlight',
 	pdfSaveScreenshot: true,
 	pdfScreenshotMaxSize: 1200,
 	pdfDefaultScale: 1.2,
@@ -494,6 +501,21 @@ export class PickmeSettingTab extends PluginSettingTab {
 					await this.plugin.refreshViews();
 				}),
 			);
+		new Setting(containerEl)
+			.setName(t('默认标注方式'))
+			.setDesc(t('荧光笔：拖一笔划过文字就自动吸附到行；框选：拖出一块区域。随时可在 PDF 工具栏切换。'))
+			.addDropdown((dropdown) => {
+				dropdown
+					.addOption('highlight', t('荧光笔'))
+					.addOption('area', t('框选'))
+					.setValue(this.plugin.settings.pdfAnnotateMode)
+					.onChange(async (value) => {
+						this.plugin.settings.pdfAnnotateMode = value === 'area' ? 'area' : 'highlight';
+						await this.plugin.saveSettings();
+						void this.plugin.refreshViews();
+					});
+			});
+
 		new Setting(containerEl)
 			.setName(t('保存区域截图'))
 			.setDesc(t('框选时把这块区域裁成 PNG 存在批注旁边，提问时作为图片送给模型。不需要图文问答就关掉，能省下这些图占的空间。'))

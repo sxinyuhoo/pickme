@@ -1,5 +1,6 @@
 import { App, MarkdownView, Notice, TFile } from 'obsidian';
 import type { PickmeSettings } from '../settings.ts';
+import { shapeKindLabel } from '../core/types.ts';
 import type { AnnotationDoc, AnnotationEntry, EntryMatch } from '../core/types.ts';
 import { matchEntries, removeAnchors, scanAnchors } from '../core/anchor.ts';
 import { fingerprint } from '../core/anchor.ts';
@@ -300,8 +301,8 @@ export class AnnotationRepository {
 			const sourceName = (sourcePath.split('/').pop() ?? sourcePath).replace(/\.md$/, '');
 			for (const entry of doc.entries) {
 				const selection =
-					entry.kind === 'pdf'
-						? `第 ${entry.pdf?.page ?? '?'} 页区域`
+					entry.kind === 'pdf' && entry.pdf
+						? `第 ${entry.pdf.page} 页${shapeKindLabel(entry.pdf)}`
 						: shorten(entry.selection, 40);
 				rows.push(
 					`| [[${sourceName}]] | \`${entry.id}\` | ${selection} | ${entry.status === 'ok' ? '有效' : '失效'} | ${entry.qas.length} | ${entry.created || doc.updated} |`,

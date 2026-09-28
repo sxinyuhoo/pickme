@@ -6,6 +6,8 @@ import {
 	itemBox,
 	itemsInRect,
 	joinItemText,
+	linesText,
+	strokeToLines,
 	textInRect,
 } from '../src/core/pdftext.ts';
 
@@ -95,4 +97,151 @@ test('原始项的变换矩阵被正确读取', () => {
 		width: 5,
 		height: 6,
 	});
+});
+
+/* ---------- 荧光笔吸附（strokeToLines / linesText） ---------- */
+
+/** 把 [x, y] 点列写成笔迹采样点，坐标是 PDF 用户空间 */
+function stroke(list: [number, number][]) {
+	return list.map(([x, y]) => ({ x, y }));
+}
+
+function close(actual: number, expected: number, label: string) {
+	assert.ok(Math.abs(actual - expected) < 1e-6, `${label} 期望 ${expected}，实际 ${actual}`);
+}
+
+test('荧光笔单行直划：吸出一个行框，边界等于该行文字项边界', () => {
+	const items = [box('最大纵坡不应大于 3%', 100, 200, 120, 12)];
+	const lines = strokeToLines(items, stroke([[100, 202], [220, 202]]));
+	assert.equal(lines.length, 1);
+	assert.equal(lines[0].items.length, 1);
+	assert.equal(lines[0].items[0].str, '最大纵坡不应大于 3%');
+	// 行带纵向 = [y - 0.3h, y + 0.8h] = [200 - 3.6, 200 + 9.6]；横向 = 命中项边界 100 到 220
+	close(lines[0].rect[0], 100, '左边界');
+	close(lines[0].rect[1], 196.4, '下边界');
+	close(lines[0].rect[2], 220, '右边界');
+	close(lines[0].rect[3], 209.6, '上边界');
+	assert.equal(linesText(lines), '最大纵坡不应大于 3%');
+});
+
+test('荧光笔斜划跨 3 行：3 个行框，按上到下排序', () => {
+	const items = [
+		box('第一行文字', 100, 300, 80, 12),
+		box('第二行文字', 100, 280, 80, 12),
+		box('第三行文字', 100, 260, 80, 12),
+	];
+	// 斜线从 y=305 降到 y=265，横坐标 110→170，全程落在文字项的 x 范围内
+	const lines = strokeToLines(items, stroke([[110, 305], [170, 265]]));
+	assert.deepEqual(
+		lines.map((line) => line.items[0].str),
+		['第一行文字', '第二行文字', '第三行文字'],
+	);
+	assert.equal(linesText(lines), '第一行文字\n第二行文字\n第三行文字');
+});
+
+test('荧光笔竖划整段：段落每一行都命中', () => {
+	const items = [
+		box('第一行', 100, 300, 80, 12),
+		box('第二行', 100, 280, 80, 12),
+		box('第三行', 100, 260, 80, 12),
+		box('第四行', 100, 240, 80, 12),
+	];
+	// 竖线横坐标 130 落在每一项的 x 范围内，纵向从 310 划到 230
+	const lines = strokeToLines(items, stroke([[130, 310], [130, 230]]));
+	assert.equal(lines.length, 4);
+	assert.deepEqual(
+		lines.map((line) => line.items[0].str),
+		['第一行', '第二行', '第三行', '第四行'],
+	);
+});
+
+test('荧光笔跨双栏：每栏各自成框，不横跨中缝', () => {
+	// 真机场景：双栏论文同一基线，左栏一项 x=36 宽 233.5，右栏一项 x=319.5 宽 83，中缝 50pt
+	const items = [
+		box('Docker Desktop is available for Mac, Linux and Windows', 36, 495, 233.5, 8),
+		box('Start the docker daemon', 319.5, 495, 83, 8),
+	];
+	const lines = strokeToLines(items, stroke([[60, 508], [380, 494]]));
+	assert.deepEqual(
+		lines.map((line) => line.items[0].str),
+		['Docker Desktop is available for Mac, Linux and Windows', 'Start the docker daemon'],
+	);
+	// 左栏框的右边界是左栏文字项自身的右边界 36 + 233.5，没有伸到中缝里
+	close(lines[0].rect[2], 269.5, '左栏右边界');
+	close(lines[1].rect[0], 319.5, '右栏左边界');
+});
+
+test('上下标基线偏移小于容差：不误分成两行', () => {
+	// E 的基线 80 高 10，上标 2 的基线 83 高 7，偏移 3 < max(10,7,4)*0.6 = 6
+	const items = [box('E', 20, 80, 10, 10), box('2', 30, 83, 5, 7)];
+	const lines = strokeToLines(items, stroke([[20, 82], [40, 82]]));
+	assert.equal(lines.length, 1);
+	assert.equal(lines[0].items.length, 2);
+	// 两行的话 linesText 会带换行；同一行内间距为 0，不补空格
+	assert.equal(linesText(lines), 'E2');
+});
+
+test('横向只覆盖半行：右边界吸到笔迹覆盖处，不吸整行', () => {
+	const items = [
+		box('最大纵坡', 20, 80, 40, 10),
+		box('不应大于', 62, 80, 40, 10),
+		box('3%', 104, 80, 12, 10),
+	];
+	// 划到 x=78 就收笔，最后一项「3%」起点 104，没被碰过
+	const lines = strokeToLines(items, stroke([[20, 82], [78, 82]]));
+	assert.equal(lines.length, 1);
+	assert.deepEqual(
+		lines[0].items.map((item) => item.str),
+		['最大纵坡', '不应大于'],
+	);
+	close(lines[0].rect[0], 20, '左边界');
+	// 命中项右边界 = 62 + 40 = 102；整行右边界是 116，没有被吸进来
+	close(lines[0].rect[2], 102, '右边界');
+});
+
+test('空白处划线返回空数组', () => {
+	const items = [box('正文', 20, 300, 40, 12), box('   ', 20, 200, 40, 12)];
+	assert.deepEqual(strokeToLines(items, stroke([[300, 100], [360, 100]])), []);
+	// 行与行之间的空白：纵向不落进任何行带
+	assert.deepEqual(strokeToLines(items, stroke([[20, 290], [60, 290]])), []);
+	// 连页码都没有的扫描件（无文字项）
+	assert.deepEqual(strokeToLines([], stroke([[300, 100], [360, 100]])), []);
+});
+
+test('单点（单击）返回空数组', () => {
+	const items = [box('正文', 20, 300, 40, 12)];
+	assert.deepEqual(strokeToLines(items, stroke([[30, 302]])), []);
+	assert.deepEqual(strokeToLines(items, []), []);
+	// 短到只剩手抖的一段（总长 6，首尾各丢 4）也作废
+	assert.deepEqual(strokeToLines(items, stroke([[30, 302], [36, 302]])), []);
+});
+
+test('快速拖动（相邻采样点间距很大）：补齐采样后不漏行', () => {
+	const items = [
+		box('第一行', 100, 300, 120, 12),
+		box('第二行', 100, 280, 120, 12),
+		box('第三行', 100, 260, 120, 12),
+	];
+	// pointermove 只报了首尾两点，中间 200pt 一点采样都没有；
+	// 两个端点还都在文字项的 x 范围（100~220）之外，命中只能来自线段与行带相交。
+	const lines = strokeToLines(items, stroke([[60, 320], [260, 240]]));
+	assert.deepEqual(
+		lines.map((line) => line.items[0].str),
+		['第一行', '第二行', '第三行'],
+	);
+});
+
+test('吸附结果按先上后下、再左到右排序', () => {
+	// 同一基线两项分属左右栏，跨中缝划线后应当先出左栏
+	const items = [
+		box('右栏', 320, 400, 40, 10),
+		box('左栏', 40, 400, 40, 10),
+		box('下一行', 40, 380, 40, 10),
+	];
+	// 一笔先横跨两栏，再折回左下角划到下一行
+	const lines = strokeToLines(items, stroke([[40, 398], [355, 398], [40, 382], [80, 382]]));
+	assert.deepEqual(
+		lines.map((line) => line.items[0].str),
+		['左栏', '右栏', '下一行'],
+	);
 });

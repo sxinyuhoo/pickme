@@ -6,13 +6,14 @@ import type { PDFDocumentProxy, PDFPageProxy, RenderTaskHandle } from './pdfjs.t
 import { decideWheel } from './paging.ts';
 import { flattenOutline } from './outline.ts';
 import type { RawOutlineItem, TocEntry } from './outline.ts';
-import { dragRect, hasMinimumSize, textInRect } from '../core/pdftext.ts';
-import type { Point, RawTextItem } from '../core/pdftext.ts';
-import { pdfToScreenRect, screenToPdfRect, toNormalized } from '../core/pdfgeom.ts';
+import { dragRect, hasMinimumSize, itemBox, linesText, strokeToLines, textInRect } from '../core/pdftext.ts';
+import type { LineBox, Point, RawTextItem, StrokePoint } from '../core/pdftext.ts';
+import { pdfToScreenRect, screenToPdfPoint, screenToPdfRect, toNormalized } from '../core/pdfgeom.ts';
 import type { Rect } from '../core/pdfgeom.ts';
 import { fingerprint, newAnchorId } from '../core/anchor.ts';
 import { nowIso } from '../util.ts';
-import type { AnnotationEntry } from '../core/types.ts';
+import { shapeKindLabel, shapesOf } from '../core/types.ts';
+import type { AnnotationEntry, PdfAnchorInfo, PdfShape } from '../core/types.ts';
 import { askPanelOf, openAskPanel as mountAskPanel } from '../ui/askPanel.ts';
 import type { AskPanelAnchor } from '../ui/askPanel.ts';
 
@@ -33,8 +34,14 @@ interface PageSlot {
 	overlay: HTMLElement;
 	marquee: HTMLElement;
 	page: PDFPageProxy | null;
-	/** scale = 1 时的 PDF 尺寸（pt） */
+	/** scale = 1 时的 PDF 尺寸（pt），已含页面旋转 */
 	base: [number, number];
+	/** 未旋转的 PDF 用户空间尺寸：文字项坐标在这个空间里，旋转页的换算必须用它 */
+	viewSize: [number, number];
+	/** 页面旋转角，0/90/180/270 */
+	rotation: number;
+	/** 荧光笔拖动的实时吸附预览层 */
+	preview: HTMLElement;
 	/** 该页的文字项：框选后用来把区域里的文字摘出来，随截图一起送给模型 */
 	text: RawTextItem[];
 	rendered: boolean;
@@ -84,9 +91,15 @@ export class PickmePdfView extends FileView {
 	private pageInput: HTMLInputElement | null = null;
 	private dragSlot: PageSlot | null = null;
 	private dragStart: Point | null = null;
+	/** 荧光笔这一笔的屏幕采样点：吸附预览与建批注都用它 */
+	private strokePoints: Point[] = [];
+	/** 拖动预览合并到一帧里重算 */
+	private previewScheduled = false;
 	/** 这次按下的落点在已有的框上——抬手时要开这条批注而不是新建 */
 	private pendingMarkId: string | null = null;
 	private panelEntryId: string | null = null;
+	/** 面板序号：旧面板被顶掉时的回调不能把新面板的状态清掉 */
+	private panelSeq = 0;
 	/** 刚框出来的那一次：按「哪一页 + 页内矩形」记，滚动后还能换算成屏幕位置 */
 	private panelAnchorSlot: PageSlot | null = null;
 	private panelAnchorRect: Rect | null = null;
@@ -111,6 +124,9 @@ export class PickmePdfView extends FileView {
 	private zoomButton: HTMLButtonElement | null = null;
 	/** 「显示/隐藏高亮」按钮，图标与文案随开关状态变 */
 	private markButton: HTMLButtonElement | null = null;
+	/** 标注方式按钮：荧光笔 / 框选，互斥 */
+	private highlighterButton: HTMLButtonElement | null = null;
+	private areaButton: HTMLButtonElement | null = null;
 	/** 目录面板与它的开关按钮（PDF 没目录时按钮不显示） */
 	private tocEl: HTMLElement | null = null;
 	private tocButton: HTMLButtonElement | null = null;
@@ -153,7 +169,8 @@ export class PickmePdfView extends FileView {
 	}
 
 	async onUnloadFile(): Promise<void> {
-		askPanelOf(this.contentEl)?.close();
+		// 视图卸载不是用户取消：刚划的批注要留着
+		askPanelOf(this.contentEl)?.close('handover');
 		this.panelEntryId = null;
 		this.panelAnchorSlot = null;
 		this.panelAnchorRect = null;
@@ -181,7 +198,7 @@ export class PickmePdfView extends FileView {
 	/** 命令「在 PDF 上框选批注」的落点：把查看器拿到前台并提示操作方式 */
 	async focusSelectionMode(): Promise<void> {
 		await this.app.workspace.revealLeaf(this.leaf);
-		this.setStatus(t('框选模式：拖动鼠标框出一块区域'));
+		this.setAnnotateMode('area');
 	}
 
 	/** 跳到某条批注：滚到对应页并闪一下它的框 */
@@ -211,9 +228,13 @@ export class PickmePdfView extends FileView {
 	openAskPanel(entryId: string, anchorSlot?: PageSlot | null, screenRect?: Rect, fresh = false): void {
 		const file = this.file;
 		if (!file) return;
+		this.panelSeq += 1;
+		const seq = this.panelSeq;
 		this.panelEntryId = entryId;
 		this.panelAnchorSlot = anchorSlot ?? null;
 		this.panelAnchorRect = screenRect ?? null;
+		// 正在读的这条完整显形，同页其它批注退到背景（样式见 styles.css 的 is-active）
+		this.applyActiveMark();
 		mountAskPanel({
 			plugin: this.plugin,
 			host: this.contentEl,
@@ -222,9 +243,13 @@ export class PickmePdfView extends FileView {
 			fresh,
 			resolveAnchor: this.resolvePanelAnchor,
 			onClose: () => {
+				// 已经有更新的面板接管了（点同一条再看一眼、或换了一条）：
+				// 这时候不能把状态清掉，否则选中态会莫名消失
+				if (this.panelSeq !== seq) return;
 				this.panelEntryId = null;
 				this.panelAnchorSlot = null;
 				this.panelAnchorRect = null;
+				this.applyActiveMark();
 			},
 		});
 	}
@@ -249,6 +274,7 @@ export class PickmePdfView extends FileView {
 	refreshLabels(): void {
 		for (const item of this.labelButtons) this.applyButtonLabel(item.el, item.key());
 		this.refreshMarkButton();
+		this.refreshModeButtons();
 		this.refreshTocButton();
 		this.refreshZoomLabel();
 		this.setStatus(this.readyStatusText());
@@ -364,6 +390,11 @@ export class PickmePdfView extends FileView {
 		this.iconButton(toolbar, 'chevrons-left-right', tKey('适应宽度'), () => void this.fitWidth());
 		this.addToolbarSep(toolbar);
 
+		// 标注方式：荧光笔（拖一笔吸附到文字行）｜框选（拖出一块区域）
+		this.highlighterButton = this.iconButton(toolbar, 'highlighter', tKey('荧光笔批注'), () => this.setAnnotateMode('highlight'), 'pickme-pdf-mode');
+		this.areaButton = this.iconButton(toolbar, 'box-select', tKey('框选批注'), () => this.setAnnotateMode('area'), 'pickme-pdf-mode');
+		this.addToolbarSep(toolbar);
+
 		// 显示：高亮总开关（关掉就是原样的 PDF，只看内容时不被标记打扰）
 		this.markButton = this.iconButton(
 			toolbar,
@@ -378,9 +409,10 @@ export class PickmePdfView extends FileView {
 
 		this.statusEl = toolbar.createDiv({
 			cls: 'pickme-pdf-status',
-			text: t('拖动鼠标框出一块区域即可提问'),
+			text: this.readyStatusText(),
 		});
 		this.refreshMarkButton();
+		this.refreshModeButtons();
 		this.refreshZoomLabel();
 		this.refreshPageTotal();
 
@@ -498,9 +530,11 @@ export class PickmePdfView extends FileView {
 		this.updateViewport(true);
 	}
 
-	/** 页面都建好后的状态文案 */
+	/** 状态文案随标注方式变，切换方式时也用它提示操作 */
 	private readyStatusText(): string {
-		return t('拖动框选提问；左右滑动翻页');
+		return this.plugin.settings.pdfAnnotateMode === 'highlight'
+			? t('拖一笔划过文字即可批注；左右滑动翻页')
+			: t('拖动框选提问；左右滑动翻页');
 	}
 
 	// ---------- 文档 ----------
@@ -516,6 +550,7 @@ export class PickmePdfView extends FileView {
 			this.refreshZoomLabel();
 			this.setStatus(this.readyStatusText());
 			this.updateViewport(true);
+			this.restoreLastPage();
 			void this.buildToc();
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
@@ -535,10 +570,16 @@ export class PickmePdfView extends FileView {
 		stage.empty();
 		this.slots = [];
 		const sizes: Array<[number, number]> = [];
+		const views: Array<[number, number]> = [];
+		const rotations: number[] = [];
 		for (let index = 1; index <= pdf.numPages; index += 1) {
 			const page = await pdf.getPage(index);
 			const base = page.getViewport({ scale: 1 });
 			sizes.push([base.width, base.height]);
+			// 文字项的 transform 在未旋转的用户空间里，旋转页必须按 view 尺寸与 rotate 换算
+			const view = page.view;
+			views.push([view[2] - view[0], view[3] - view[1]]);
+			rotations.push(((page.rotate % 360) + 360) % 360);
 		}
 		for (let index = 1; index <= pdf.numPages; index += 1) {
 			const base = sizes[index - 1] ?? [595, 842];
@@ -548,12 +589,17 @@ export class PickmePdfView extends FileView {
 			const overlay = sheet.createDiv({ cls: 'pickme-pdf-overlay' });
 			const marquee = overlay.createDiv({ cls: 'pickme-pdf-marquee' });
 			marquee.hide();
+			const preview = overlay.createDiv({ cls: 'pickme-pdf-preview' });
+			preview.hide();
 			const slot: PageSlot = {
 				index,
 				sheet,
 				canvas,
 				overlay,
 				marquee,
+				preview,
+				viewSize: views[index - 1] ?? base,
+				rotation: rotations[index - 1] ?? 0,
 				page: null,
 				base,
 				text: [],
@@ -619,6 +665,11 @@ export class PickmePdfView extends FileView {
 	private currentPageFromScroll(): number {
 		const scroll = this.scrollEl;
 		if (!scroll || !this.tops.length) return 1;
+		// 滚到底时最后一页的顶部永远到不了视口顶部（下面没有内容了），
+		// 这时直接算最后一页：否则「翻到最后一页」会被读成上一页，
+		// 阅读位置的记忆也就跟着记错。
+		const max = scroll.scrollHeight - scroll.clientHeight;
+		if (max > 0 && scroll.scrollTop >= max - 2) return this.tops.length;
 		const probe = scroll.scrollTop + 16;
 		let current = 1;
 		for (let i = 0; i < this.tops.length; i += 1) {
@@ -628,9 +679,20 @@ export class PickmePdfView extends FileView {
 		return current;
 	}
 
+	/** 回到这个文件上次读到的页码（没有记录、或记录就是第一页，就不动） */
+	private restoreLastPage(): void {
+		const file = this.file;
+		if (!file || !this.slots.length) return;
+		const saved = Math.round(Number(this.plugin.settings.pdfLastPage[file.path] ?? 1));
+		if (!Number.isFinite(saved) || saved <= 1) return;
+		this.scrollToPage(Math.min(saved, this.slots.length));
+	}
+
 	private syncPageInput(): void {
 		const page = this.currentPageFromScroll();
 		this.pageNumber = page;
+		// 读到哪记到哪：下次打开这个 PDF 从这一页接着看
+		if (this.file) this.plugin.rememberPdfPage(this.file.path, page);
 		// 用户正在页码框里打字时不要覆盖
 		if (this.pageInput && document.activeElement !== this.pageInput) {
 			this.pageInput.value = String(page);
@@ -773,6 +835,7 @@ export class PickmePdfView extends FileView {
 		const target = Math.min(Math.max(1, Math.floor(page)), this.slots.length);
 		this.pageNumber = target;
 		if (this.pageInput) this.pageInput.value = String(target);
+		if (this.file) this.plugin.rememberPdfPage(this.file.path, target);
 		if (this.tops.length !== this.slots.length) this.measureTops();
 		const top = this.tops[target - 1];
 		if (top !== undefined) scroll.scrollTop = top;
@@ -874,7 +937,7 @@ export class PickmePdfView extends FileView {
 		for (const slot of this.slots) await this.drawMarksFor(slot);
 	}
 
-	/** 画出某一页已有的批注框 */
+	/** 画出某一页已有的批注：一条批注是一组形状（框 + 若干荧光行），都装在它的外接矩形里 */
 	private async drawMarksFor(slot: PageSlot): Promise<void> {
 		slot.overlay.querySelectorAll('.pickme-pdf-mark').forEach((node) => node.remove());
 		// 关掉高亮时只清不画，页面回到原始 PDF 的样子
@@ -882,19 +945,39 @@ export class PickmePdfView extends FileView {
 		const file = this.file;
 		if (!file) return;
 		const doc = await this.plugin.loadDoc(file);
+		const size = this.slotSize(slot);
 		for (const entry of doc.entries) {
 			if (entry.kind !== 'pdf' || !entry.pdf || entry.pdf.page !== slot.index) continue;
-			const screen = pdfToScreenRect(entry.pdf.rect, this.slotSize(slot), entry.pdf.pageSize);
+			const pdf = entry.pdf;
+			// 老批注没有 rotation 字段：按 0 算，坐标与修复前逐位一致
+			const rotation = pdf.rotation ?? 0;
+			const outer = pdfToScreenRect(pdf.rect, size, pdf.pageSize, rotation);
 			const mark = slot.overlay.createDiv({ cls: 'pickme-pdf-mark' });
 			mark.setAttribute('data-pickme-id', entry.id);
 			mark.setCssProps({
-				left: `${screen[0]}px`,
-				top: `${screen[1]}px`,
-				width: `${Math.max(6, screen[2] - screen[0])}px`,
-				height: `${Math.max(6, screen[3] - screen[1])}px`,
+				left: `${outer[0]}px`,
+				top: `${outer[1]}px`,
+				width: `${Math.max(6, outer[2] - outer[0])}px`,
+				height: `${Math.max(6, outer[3] - outer[1])}px`,
 			});
 			if (entry.status === 'stale') mark.addClass('is-stale');
+			if (entry.id === this.panelEntryId) mark.addClass('is-active');
 			mark.setAttribute('title', entry.qas[0]?.question ?? entry.id);
+
+			for (const shape of shapesOf(pdf)) {
+				const screen = pdfToScreenRect(shape.rect, size, pdf.pageSize, rotation);
+				// 子形状相对外接矩形定位：外接矩形自己不收指针事件，空白处点不开批注
+				const box = mark.createDiv({ cls: shape.kind === 'line' ? 'pickme-pdf-band' : 'pickme-pdf-box' });
+				box.setCssProps({
+					left: `${screen[0] - outer[0]}px`,
+					top: `${screen[1] - outer[1]}px`,
+					width: `${Math.max(2, screen[2] - screen[0])}px`,
+					height: `${Math.max(2, screen[3] - screen[1])}px`,
+				});
+			}
+			// 页码与形状标签：只在选中或悬停时显示，静止态保持页面干净
+			const label = mark.createDiv({ cls: 'pickme-pdf-label' });
+			label.setText(t('第 {v0} 页 · {v1}', { v0: pdf.page, v1: this.shapeWord(pdf) }));
 		}
 	}
 
@@ -913,8 +996,16 @@ export class PickmePdfView extends FileView {
 		this.dragSlot = slot;
 		const point = this.relativePoint(slot, event);
 		this.dragStart = point;
-		slot.marquee.show();
-		this.updateMarquee(slot, point, point);
+		if (this.plugin.settings.pdfAnnotateMode === 'highlight') {
+			// 荧光笔：预览的是吸附后的行带，不是矩形选框
+			this.strokePoints = [point];
+			slot.preview.empty();
+			slot.preview.hide();
+		} else {
+			this.strokePoints = [];
+			slot.marquee.show();
+			this.updateMarquee(slot, point, point);
+		}
 		// 合成事件或异常指针 id 时捕获会抛错，捕获失败不影响框选
 		try {
 			slot.overlay.setPointerCapture(event.pointerId);
@@ -925,7 +1016,19 @@ export class PickmePdfView extends FileView {
 
 	private onPointerMove(slot: PageSlot, event: PointerEvent): void {
 		if (!this.dragStart || this.dragSlot !== slot) return;
-		this.updateMarquee(slot, this.dragStart, this.relativePoint(slot, event));
+		const point = this.relativePoint(slot, event);
+		if (this.plugin.settings.pdfAnnotateMode === 'highlight') {
+			this.strokePoints.push(point);
+			// 吸附比画矩形贵，但只跟这一页的文字项数量成正比，合并到一帧里重算就够
+			if (this.previewScheduled) return;
+			this.previewScheduled = true;
+			window.requestAnimationFrame(() => {
+				this.previewScheduled = false;
+				if (this.dragSlot === slot) this.renderStrokePreview(slot);
+			});
+			return;
+		}
+		this.updateMarquee(slot, this.dragStart, point);
 	}
 
 	private async onPointerUp(slot: PageSlot, event: PointerEvent): Promise<void> {
@@ -940,6 +1043,18 @@ export class PickmePdfView extends FileView {
 		}
 		if (!start) return;
 		const end = this.relativePoint(slot, event);
+		if (this.plugin.settings.pdfAnnotateMode === 'highlight') {
+			this.strokePoints.push(end);
+			const lines = this.snappedLines(slot);
+			this.strokePoints = [];
+			if (!lines.length) {
+				// 划在图片或空白上：不建批注，也不偷偷退化成矩形
+				this.setStatus(t('这里没有可取的文字，切到框选可框选区域'));
+				return;
+			}
+			await this.createHighlightAnnotation(slot, lines);
+			return;
+		}
 		const screenRect = dragRect(start, end);
 		if (hasMinimumSize(screenRect, 8)) {
 			await this.createAnnotation(slot, screenRect);
@@ -951,6 +1066,7 @@ export class PickmePdfView extends FileView {
 
 	private resetDrag(): void {
 		this.dragSlot?.marquee.hide();
+		this.dragSlot?.preview.hide();
 		this.dragSlot = null;
 		this.dragStart = null;
 	}
@@ -974,7 +1090,9 @@ export class PickmePdfView extends FileView {
 		const file = this.file;
 		if (!file) return;
 		const size = this.slotSize(slot);
-		const rect = screenToPdfRect(screenRect, size, slot.base);
+		const viewSize = this.viewSizeOf(slot);
+		const rotation = this.rotationOf(slot);
+		const rect = screenToPdfRect(screenRect, size, viewSize, rotation);
 		const hitText = textInRect(slot.text, rect);
 		this.setStatus(hitText ? t('已选中：{v0}', { v0: hitText.slice(0, 40) }) : t('已选中一块区域（未取到文字）'));
 
@@ -992,9 +1110,11 @@ export class PickmePdfView extends FileView {
 			qas: [],
 			pdf: {
 				page: slot.index,
-				pageSize: slot.base,
+				pageSize: viewSize,
 				rect,
-				normRect: toNormalized(rect, slot.base),
+				normRect: toNormalized(rect, viewSize),
+				// 不旋转的页面不写这个字段，文件内容与修复前保持一致
+				...(rotation ? { rotation } : {}),
 				hitText,
 				image,
 			},
@@ -1005,6 +1125,143 @@ export class PickmePdfView extends FileView {
 		this.setStatus(hitText ? t('已批注：{v0}', { v0: hitText.slice(0, 40) }) : t('已批注一块区域，可直接在面板里提问'));
 
 		// 框完就在页面上直接提问；关掉这个开关才回退到侧边栏
+		if (this.plugin.settings.inlineAsk) {
+			this.openAskPanel(id, slot, screenRect, true);
+		} else {
+			const sidebar = await this.plugin.openSidebar();
+			await sidebar.setFile(file);
+			sidebar.setActiveEntry(id);
+		}
+	}
+
+	// ---------- 荧光笔 ----------
+
+	/** 切换标注方式：荧光笔（拖一笔吸附到文字行）/ 框选（拖出一块区域） */
+	private setAnnotateMode(mode: 'highlight' | 'area'): void {
+		this.plugin.settings.pdfAnnotateMode = mode;
+		void this.plugin.saveSettings();
+		this.refreshModeButtons();
+		this.setStatus(this.readyStatusText());
+	}
+
+	/** 两个方式按钮互斥高亮 */
+	private refreshModeButtons(): void {
+		const mode = this.plugin.settings.pdfAnnotateMode;
+		this.highlighterButton?.toggleClass('is-active', mode === 'highlight');
+		this.areaButton?.toggleClass('is-active', mode === 'area');
+	}
+
+	/** 正在读的那条批注完整显形，同页其它批注退到背景（样式见 styles.css 的 is-active） */
+	private applyActiveMark(): void {
+		for (const slot of this.slots) {
+			for (const mark of slot.overlay.querySelectorAll<HTMLElement>('.pickme-pdf-mark')) {
+				mark.toggleClass('is-active', mark.getAttribute('data-pickme-id') === this.panelEntryId);
+			}
+		}
+	}
+
+	/** 形状短称：这里静态写 t()，i18n 覆盖测试才认得出这几个词 */
+	private shapeWord(pdf: PdfAnchorInfo): string {
+		const kind = shapeKindLabel(pdf);
+		if (kind === '框+线') return t('框+线');
+		return kind === '荧光' ? t('荧光') : t('框选');
+	}
+
+	/** 这一页未旋转的用户空间尺寸；槽位还没量到尺寸时退回显示尺寸（那时也没有文字可吸附） */
+	private viewSizeOf(slot: PageSlot): [number, number] {
+		return slot.viewSize ?? slot.base;
+	}
+
+	private rotationOf(slot: PageSlot): number {
+		return slot.rotation ?? 0;
+	}
+
+	/** 屏幕点 → PDF 用户空间点（带页面旋转换算） */
+	private toPdfPoint(slot: PageSlot, point: Point): StrokePoint {
+		return screenToPdfPoint(point, this.slotSize(slot), this.viewSizeOf(slot), this.rotationOf(slot));
+	}
+
+	/** 这一笔吸附出来的行框（PDF 用户空间）：预览与建批注走同一个函数，所见即所得 */
+	private snappedLines(slot: PageSlot): LineBox[] {
+		const items = slot.text.map(itemBox);
+		const points = this.strokePoints.map((point) => this.toPdfPoint(slot, point));
+		return strokeToLines(items, points);
+	}
+
+	/** 行框换算成屏幕矩形 */
+	private lineScreenRect(slot: PageSlot, line: LineBox): Rect {
+		return pdfToScreenRect(line.rect, this.slotSize(slot), this.viewSizeOf(slot), this.rotationOf(slot));
+	}
+
+	/** 拖动过程中实时画吸附结果：松手不改变已经看到的东西 */
+	private renderStrokePreview(slot: PageSlot): void {
+		slot.preview.empty();
+		const lines = this.snappedLines(slot);
+		if (!lines.length) {
+			slot.preview.hide();
+			return;
+		}
+		slot.preview.show();
+		for (const line of lines) {
+			const rect = this.lineScreenRect(slot, line);
+			const band = slot.preview.createDiv({ cls: 'pickme-pdf-band' });
+			band.setCssProps({
+				left: `${rect[0]}px`,
+				top: `${rect[1]}px`,
+				width: `${Math.max(2, rect[2] - rect[0])}px`,
+				height: `${Math.max(2, rect[3] - rect[1])}px`,
+			});
+		}
+	}
+
+	/** 荧光笔建批注：每行一个 line 形状，外接矩形留给面板定位、索引与老版本回显 */
+	private async createHighlightAnnotation(slot: PageSlot, lines: LineBox[]): Promise<void> {
+		const file = this.file;
+		if (!file) return;
+		const viewSize = this.viewSizeOf(slot);
+		const rotation = this.rotationOf(slot);
+		const shapes: PdfShape[] = lines.map((line) => ({
+			kind: 'line',
+			rect: line.rect,
+			norm: toNormalized(line.rect, viewSize),
+		}));
+		const box: Rect = [
+			Math.min(...shapes.map((shape) => shape.rect[0])),
+			Math.min(...shapes.map((shape) => shape.rect[1])),
+			Math.max(...shapes.map((shape) => shape.rect[2])),
+			Math.max(...shapes.map((shape) => shape.rect[3])),
+		];
+		const hitText = linesText(lines);
+		const preview = hitText.replace(/\s+/g, ' ').slice(0, 40);
+		this.setStatus(t('已批注：{v0}', { v0: preview }));
+
+		const id = newAnchorId();
+		const entry: AnnotationEntry = {
+			id,
+			kind: 'pdf',
+			selection: '',
+			fingerprint: fingerprint(hitText || `p${slot.index}:${box.join(',')}`),
+			status: 'ok',
+			created: nowIso(),
+			qas: [],
+			pdf: {
+				page: slot.index,
+				pageSize: viewSize,
+				rect: box,
+				normRect: toNormalized(box, viewSize),
+				shapes,
+				// 不旋转的页面不写这个字段，文件内容与修复前保持一致
+				...(rotation ? { rotation } : {}),
+				hitText,
+				// 荧光笔是文字批注：不截图，省空间也省一次画布裁切
+				image: '',
+			},
+		};
+
+		await this.plugin.repository.addEntry(file, entry);
+		await this.drawMarksFor(slot);
+		const screenRect = this.lineScreenRect(slot, { rect: box, items: [] });
+
 		if (this.plugin.settings.inlineAsk) {
 			this.openAskPanel(id, slot, screenRect, true);
 		} else {

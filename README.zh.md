@@ -13,6 +13,8 @@
 | ![在笔记里选中一段文字，面板就地打开](docs/screenshots/01-select-text-then-ask.png) | ![回答出现在面板里，并写进批注文件](docs/screenshots/02-answer-in-panel.png) |
 | ![在 PDF 页面拖出矩形区域](docs/screenshots/03-pdf-region-annotate.png) | ![批注索引，按源文档分组](docs/screenshots/04-annotation-index.png) |
 
+在 PDF 上有两种标注方式，工具栏里切换：拖**矩形**框住一块区域（区域里的文字与截图一起送给模型），或者拖**荧光笔**划过文字——笔画会自动吸附到文字行并渲染成干净的行带，手抖也不影响。同一条批注上两种可以叠加。
+
 在 PDF 上拖一个矩形，区域里的文字与截图一起送给模型，框留在页面上，以后点它就能重新打开：
 
 ![自带 pdf.js 阅读器与目录](docs/screenshots/05-pdf-viewer-outline.png)

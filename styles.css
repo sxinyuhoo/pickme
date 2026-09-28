@@ -539,24 +539,99 @@ body.pickme-mark-border .pickme-mark {
 	pointer-events: none;
 }
 
+/* 荧光笔拖动中的实时吸附预览：与最终画出来的行带同形，松手不变样 */
+.pickme-pdf-preview {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.pickme-pdf-preview .pickme-pdf-band {
+	opacity: 0.75;
+}
+
+/* 一条批注的容器：只占它的外接矩形，自己不吃指针事件（空白处点不开批注） */
 .pickme-pdf-mark {
 	position: absolute;
-	border: 1px solid var(--pickme-highlight);
-	background: color-mix(in srgb, var(--pickme-highlight) 22%, transparent);
+	pointer-events: none;
+}
+
+/* 荧光行：像荧光笔压过纸面，正片叠底让文字透出来 */
+.pickme-pdf-band {
+	position: absolute;
+	background: color-mix(in srgb, var(--pickme-highlight) 40%, transparent);
+	mix-blend-mode: multiply;
+	border-radius: 1px;
+	pointer-events: auto;
 	cursor: pointer;
 }
 
-.pickme-pdf-mark:hover {
-	background: color-mix(in srgb, var(--pickme-highlight) 40%, transparent);
+/* 框选：细描边、几乎不填充，和色带叠在一起也不会糊成一块 */
+.pickme-pdf-box {
+	position: absolute;
+	border: 1px solid rgb(74 122 178 / 72%);
+	background: rgb(74 122 178 / 5%);
+	border-radius: 1px;
+	pointer-events: auto;
+	cursor: pointer;
 }
 
+.pickme-pdf-mark:hover .pickme-pdf-box {
+	border-color: rgb(60 110 170 / 95%);
+}
+
+/* 正在读的那条完整显形，同页其它批注退到背景 */
+.pickme-pdf-mark.is-active .pickme-pdf-band {
+	background: color-mix(in srgb, var(--pickme-highlight) 52%, transparent);
+}
+
+.pickme-pdf-mark.is-active .pickme-pdf-box {
+	border-color: rgb(60 110 170 / 95%);
+}
+
+.pickme-pdf-overlay:has(.pickme-pdf-mark.is-active) .pickme-pdf-mark:not(.is-active) {
+	opacity: 0.15;
+}
+
+/* 失效批注：虚线 + 压暗 */
 .pickme-pdf-mark.is-stale {
-	border-style: dashed;
 	opacity: 0.7;
 }
 
-.pickme-pdf-mark.is-flash {
-	background: color-mix(in srgb, var(--interactive-accent) 55%, transparent);
+.pickme-pdf-mark.is-stale .pickme-pdf-box {
+	border-style: dashed;
+}
+
+.pickme-pdf-mark.is-stale .pickme-pdf-band {
+	outline: 1px dashed var(--pickme-highlight);
+	outline-offset: 1px;
+}
+
+/* 页码与形状标签：只在选中或悬停时出现，静止态保持页面干净 */
+.pickme-pdf-label {
+	display: none;
+	position: absolute;
+	left: 0;
+	top: -13px;
+	padding: 0 4px;
+	border-radius: 2px;
+	background: rgb(60 110 170 / 95%);
+	color: #fff;
+	font-size: 8.5px;
+	line-height: 13px;
+	white-space: nowrap;
+	pointer-events: none;
+}
+
+.pickme-pdf-mark.is-active .pickme-pdf-label,
+.pickme-pdf-mark:hover .pickme-pdf-label {
+	display: block;
+}
+
+.pickme-pdf-mark.is-flash .pickme-pdf-band,
+.pickme-pdf-mark.is-flash .pickme-pdf-box {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 1px;
 }
 
 .pickme-thumb {

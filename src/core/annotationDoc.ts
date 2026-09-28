@@ -1,12 +1,63 @@
-import type { AnnotationDoc, AnnotationEntry, PdfAnchorInfo, QA } from './types.ts';
+import type { AnnotationDoc, AnnotationEntry, PdfAnchorInfo, PdfShape, QA } from './types.ts';
+import { shapesOf } from './types.ts';
+import type { Rect } from './pdfgeom.ts';
 import { parseFrontmatter, stringifyFrontmatter } from './frontmatter.ts';
 
 const ENTRY_HEAD = '## 锚点 ';
 const STATUS_OK = '有效';
 const STATUS_STALE = '失效';
+/** 完整命中文本所在的小节名；多行文字必须落在这里，单行 bullet 存不住换行 */
+const HIT_TEXT_SECTION = '命中文本';
+/** 单行命中文本摘要的截断长度 */
+const HIT_TEXT_LIMIT = 120;
 
 function entryStatusLabel(entry: AnnotationEntry): string {
 	return entry.status === 'ok' ? STATUS_OK : STATUS_STALE;
+}
+
+/** 形状集合 →「形状」字段取值：框 / 线 / 框+线。老批注走 shapesOf，只有一个 area 时为纯框选 */
+function shapeLabel(pdf: PdfAnchorInfo): string {
+	const kinds = new Set(shapesOf(pdf).map((s) => s.kind));
+	const parts: string[] = [];
+	if (kinds.has('area')) parts.push('框');
+	if (kinds.has('line')) parts.push('线');
+	return parts.join('+') || '框';
+}
+
+/** 用户空间矩形 → 归一化矩形（与页面尺寸同向，不做翻转） */
+function normFromRect(rect: Rect, pageSize: [number, number]): Rect {
+	const [w, h] = pageSize;
+	if (!w || !h) return [0, 0, 0, 0];
+	return [rect[0] / w, rect[1] / h, rect[2] / w, rect[3] / h];
+}
+
+/** 归一化矩形 → 用户空间矩形 */
+function rectFromNorm(norm: Rect, pageSize: [number, number]): Rect {
+	return [norm[0] * pageSize[0], norm[1] * pageSize[1], norm[2] * pageSize[0], norm[3] * pageSize[1]];
+}
+
+/** 多个矩形拼成一行：分号分隔；digits 为小数位，0 表示取整的用户空间坐标 */
+function formatRects(rects: Rect[], digits: number): string {
+	return rects
+		.map((r) => r.map((n) => (digits > 0 ? n.toFixed(digits) : String(Math.round(n)))).join(','))
+		.join(';');
+}
+
+/** 解析分号分隔的矩形串；坏掉的片段跳过而不是抛错 */
+function parseRects(text: string | undefined): Rect[] {
+	const rects: Rect[] = [];
+	for (const chunk of (text ?? '').split(';')) {
+		const parts = chunk.split(',').map((n) => Number(n));
+		if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) continue;
+		rects.push([parts[0], parts[1], parts[2], parts[3]]);
+	}
+	return rects;
+}
+
+/** 命中文本的单行摘要：只留首行，换行折叠成空格，超长截断 */
+function hitTextSummary(text: string): string {
+	const oneLine = (text.split('\n')[0] ?? '').trim().replace(/\s+/g, ' ');
+	return oneLine.length > HIT_TEXT_LIMIT ? oneLine.slice(0, HIT_TEXT_LIMIT) : oneLine;
 }
 
 /** 单条批注渲染为 Markdown 片段 */
@@ -17,6 +68,7 @@ export function renderEntry(entry: AnnotationEntry): string {
 	if (entry.kind === 'text') {
 		lines.push(`- 选区：${entry.selection}`);
 	}
+	if (entry.pdf) lines.push(`- 形状：${shapeLabel(entry.pdf)}`);
 	lines.push(`- 锚点 id：${entry.id}`);
 	// 兜底：字段缺失时宁可不写，也不要在文件里留下 undefined 这种字面量
 	lines.push(`- 定位指纹：${entry.fingerprint ?? ''}`);
@@ -24,12 +76,30 @@ export function renderEntry(entry: AnnotationEntry): string {
 	lines.push(`- 创建：${entry.created ?? ''}`);
 	if (entry.pdf) {
 		const pdf = entry.pdf;
+		const shapes = shapesOf(pdf);
+		const lineShapes = shapes.filter((s) => s.kind === 'line');
+		const areaShapes = shapes.filter((s) => s.kind === 'area');
 		lines.push(`- 页码：${pdf.page}`);
 		lines.push(`- 页面尺寸：${pdf.pageSize[0]}x${pdf.pageSize[1]}`);
 		lines.push(`- 矩形：${pdf.rect.join(',')}`);
 		lines.push(`- 归一化矩形：${pdf.normRect.map((n) => n.toFixed(4)).join(',')}`);
-		if (pdf.hitText) lines.push(`- 命中文本：${pdf.hitText}`);
+		// 线形状与框形状分开写：线用「荧光行」，框用「框」，都支持分号分隔的多个
+		if (lineShapes.length) {
+			lines.push(`- 荧光行：${formatRects(lineShapes.map((s) => s.rect), 0)}`);
+			lines.push(`- 归一化荧光行：${formatRects(lineShapes.map((s) => s.norm), 4)}`);
+		}
+		if (areaShapes.length) {
+			lines.push(`- 框：${formatRects(areaShapes.map((s) => s.rect), 0)}`);
+			lines.push(`- 归一化框：${formatRects(areaShapes.map((s) => s.norm), 4)}`);
+		}
+		if (pdf.color) lines.push(`- 颜色：${pdf.color}`);
+		if (pdf.rotation) lines.push(`- 页面旋转：${pdf.rotation}`);
+		if (pdf.hitText) lines.push(`- 命中文本：${hitTextSummary(pdf.hitText)}`);
 		if (pdf.image) lines.push('', `![[${pdf.image}]]`);
+	}
+	// 完整命中文本单独成节：单行 bullet 里塞多行文字，落盘后再解析只剩第一行
+	if (entry.pdf?.hitText) {
+		lines.push('', `### ${HIT_TEXT_SECTION}`, '', entry.pdf.hitText);
 	}
 
 	entry.qas.forEach((qa, index) => {
@@ -138,7 +208,7 @@ export function parseAnnotationDoc(text: string, selfPath: string): AnnotationDo
 			qas: [],
 		};
 		if (kind === 'pdf') {
-			entry.pdf = parsePdfInfo(values, head);
+			entry.pdf = parsePdfInfo(values, sections, head);
 		}
 
 		const question = sectionText(sections, '提问');
@@ -178,19 +248,56 @@ export function parseAnnotationDoc(text: string, selfPath: string): AnnotationDo
 	};
 }
 
-function parsePdfInfo(values: Map<string, string>, head: string[]): PdfAnchorInfo {
+/**
+ * 形状集合的解析：以归一化字段为准，缺失时用用户空间字段按页面尺寸换算。
+ * 两者都没有（老批注）时留 undefined，交由 shapesOf 退化成单个框。
+ */
+function parseShapes(values: Map<string, string>, pageSize: [number, number]): PdfShape[] | undefined {
+	const normLines = parseRects(values.get('归一化荧光行'));
+	const normAreas = parseRects(values.get('归一化框'));
+	if (normLines.length || normAreas.length) {
+		return [
+			...normLines.map((norm): PdfShape => ({ kind: 'line', norm, rect: rectFromNorm(norm, pageSize) })),
+			...normAreas.map((norm): PdfShape => ({ kind: 'area', norm, rect: rectFromNorm(norm, pageSize) })),
+		];
+	}
+	const rawLines = parseRects(values.get('荧光行'));
+	const rawAreas = parseRects(values.get('框'));
+	if (rawLines.length || rawAreas.length) {
+		return [
+			...rawLines.map((rect): PdfShape => ({ kind: 'line', rect, norm: normFromRect(rect, pageSize) })),
+			...rawAreas.map((rect): PdfShape => ({ kind: 'area', rect, norm: normFromRect(rect, pageSize) })),
+		];
+	}
+	return undefined;
+}
+
+function parsePdfInfo(
+	values: Map<string, string>,
+	sections: Map<string, string[]>,
+	head: string[],
+): PdfAnchorInfo {
 	const size = (values.get('页面尺寸') ?? '').split('x').map((n) => Number(n));
 	const rect = (values.get('矩形') ?? '').split(',').map((n) => Number(n));
 	const norm = (values.get('归一化矩形') ?? '').split(',').map((n) => Number(n));
 	const image = head.join('\n').match(/!\[\[([^\]]+)\]\]/)?.[1] ?? '';
-	return {
+	const pageSize: [number, number] = [size[0] || 0, size[1] || 0];
+	const pdf: PdfAnchorInfo = {
 		page: Number(values.get('页码') ?? 1),
-		pageSize: [size[0] || 0, size[1] || 0],
+		pageSize,
 		rect: [rect[0] || 0, rect[1] || 0, rect[2] || 0, rect[3] || 0],
 		normRect: [norm[0] || 0, norm[1] || 0, norm[2] || 0, norm[3] || 0],
-		hitText: values.get('命中文本') ?? '',
+		// 命中文本优先取小节里的完整文字，没有小节才回退到单行 bullet
+		hitText: sectionText(sections, HIT_TEXT_SECTION) || (values.get('命中文本') ?? ''),
 		image,
 	};
+	const shapes = parseShapes(values, pageSize);
+	if (shapes) pdf.shapes = shapes;
+	const color = (values.get('颜色') ?? '').trim();
+	if (color) pdf.color = color;
+	const rotation = Number(values.get('页面旋转'));
+	if (Number.isFinite(rotation) && rotation !== 0) pdf.rotation = rotation;
+	return pdf;
 }
 
 export function countQAs(entries: AnnotationEntry[]): number {

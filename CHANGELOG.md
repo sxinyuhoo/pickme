@@ -2,6 +2,30 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.0.6
+
+### Added
+
+- **Highlighter annotations in PDFs.** Drag a free-hand stroke across text and it snaps to the lines underneath: the wobble is thrown away and you get a clean band hugging each line, spanning from the first character the stroke touched to the last. A stroke across several lines yields one band per line, and the text of every covered line is stored with the annotation, so the model reads what you meant.
+- The PDF toolbar now has two mutually exclusive annotation modes - **Highlighter** and **Region** - and the choice is remembered between sessions. Both can be used on the same content: a box plus strokes on one annotation render as a band for the text and a thin outline for the area, so they never fight visually.
+- Where you are in the document is now drawn on the page: the annotation you are reading keeps its full strength and gets a "Page N - Highlighter" (or "Region") tag, while the other annotations on that page fade to 15%.
+- **PDFs remember where you stopped reading.** The page you are on is recorded as you scroll (per file, and only written to disk when it settles), so closing the tab or the app and coming back resumes at that page instead of page 1. The list is capped at the 200 most recently read files.
+
+### Fixed
+
+- **An annotation could be deleted by the act of reading it.** Closing a panel because a new one was taking over was treated as a cancel, so clicking a highlight you had just drawn removed it. Only an explicit cancel (the x button or Esc) undoes an annotation that was never asked about.
+- The active-annotation state vanished as soon as it was set: the outgoing panel's callback cleared the view's current annotation id after the new panel had already claimed it.
+- Rotated PDF pages are converted through the page's rotation instead of assuming it is upright, which had put annotations in the wrong place.
+- Multi-line hit text was truncated to its first line when written to disk. The full text is kept in its own section, with the one-line bullet kept as a preview.
+- A stroke drawn over an image or blank space no longer creates an empty annotation: it says so and leaves the page alone.
+
+### Changed
+
+- On the last page of a document the page counter now reads the last page when you scroll to the end. Before, the final page could never reach the top of the viewport (there is nothing below it to scroll), so scrolling to the end reported the second-to-last page — and that wrong number was what a remembered reading position was based on.
+- The browser `fetch` call now lives in a single documented helper. It cannot be removed: Obsidian's `requestUrl` is issued from the main process and cannot see a streaming response body, so real streaming (and the "endpoint rejects the thinking parameter, so retry without it" logic) needs `fetch`; the `/models` probe also keeps a `fetch` fallback for relay endpoints that only answer browser-origin requests. Every request that does not need streaming still goes through `requestUrl` first.
+- Highlighter annotations do not store a region screenshot - the text is enough, and it keeps the vault small. Region annotations still do.
+- The annotation index, the sidebar and the anchor autocomplete now say which shape an annotation is ("Page 12 - Highlighter", "Page 12 - Region", "Page 12 - Region + strokes") instead of always saying "Region".
+
 ## 1.0.5
 
 ### Fixed

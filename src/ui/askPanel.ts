@@ -45,6 +45,9 @@ export interface AskPanelOptions {
 
 const PANEL_WIDTH = 380;
 
+/** 关面板的原因：用户主动取消，还是被新面板顶掉 */
+export type PanelCloseReason = 'user' | 'handover';
+
 /** 每个宿主视图只留一个面板 */
 const panels = new WeakMap<HTMLElement, AskPanel>();
 
@@ -53,7 +56,8 @@ const panels = new WeakMap<HTMLElement, AskPanel>();
  * 同一个视图里再打开时会先关掉上一个。
  */
 export function openAskPanel(options: AskPanelOptions): AskPanel {
-	panels.get(options.host)?.close();
+	// 被新面板顶掉不算「取消」：用户是去开另一条批注了，刚划的那条要留下
+	panels.get(options.host)?.close('handover');
 	// 插件被重载/禁用时，旧实例挂在宿主里的浮层没人清理，会一直留在 DOM 上
 	// （堆叠的面板还会抢走点击与滚动）。开新面板前先扫掉。
 	for (const stale of Array.from(options.host.querySelectorAll('.pickme-inline-layer'))) {
@@ -137,7 +141,12 @@ export class AskPanel implements AskSink {
 		this.questionInput?.focus();
 	}
 
-	close(): void {
+	/**
+	 * 关面板。reason='user' 是用户主动取消（× / Esc / 删除），
+	 * reason='handover' 是被新面板顶掉或视图卸载——那种情况不能算取消，
+	 * 否则「划一笔 → 点同一条再看一眼」会把自己这条批注删掉。
+	 */
+	close(reason: PanelCloseReason = 'user'): void {
 		if (this.closed) return;
 		this.closed = true;
 		window.removeEventListener('scroll', this.onViewportChange, true);
@@ -147,12 +156,13 @@ export class AskPanel implements AskSink {
 		this.root = null;
 		this.child.unload();
 		this.onClose();
-		void this.discardIfUntouched();
+		if (reason === 'user') void this.discardIfUntouched();
 	}
 
 	/**
-	 * 刚框出来的批注、且一次都没问过：关掉面板就等于取消，
+	 * 刚框出来的批注、且一次都没问过：用户主动关掉面板就等于取消，
 	 * 把它和页面上的高亮一起撤掉，不留半条空批注。
+	 * 只在 close('user') 时走到这里——被新面板顶掉时批注要留着。
 	 */
 	private async discardIfUntouched(): Promise<void> {
 		if (!this.fresh) return;
