@@ -300,6 +300,10 @@ export class PickmeSidebarView extends ItemView implements AskSink {
 		if (selection) {
 			card.createDiv({ cls: 'pickme-selection', text: shorten(selection, 120) });
 		}
+		// 高亮带的那句简单批注（与 AI 问答无关），在侧边栏里也要看得见
+		if (entry.note?.trim()) {
+			card.createDiv({ cls: 'pickme-note-text', text: shorten(entry.note.trim(), 200) });
+		}
 
 		// PDF 批注显示框选区域的缩略图
 		if (entry.kind === 'pdf' && entry.pdf?.image) {

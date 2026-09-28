@@ -78,6 +78,8 @@ export interface AnnotationEntry {
 	status: 'ok' | 'stale';
 	created: string;
 	qas: QA[];
+	/** 荧光笔高亮的简单批注（一句话备注），与 AI 问答无关；留空表示只有高亮 */
+	note?: string;
 	pdf?: PdfAnchorInfo;
 }
 

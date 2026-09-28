@@ -2,6 +2,22 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.0.9
+
+### Added
+
+- **Highlights take a note.** Finishing a highlighter stroke opens a small note box instead of the AI composer: type a line, then ⌘/Ctrl + Enter to save. The note lives with the highlight (`- 备注：…` in the annotation file), shows up in the annotation index and the sidebar, and comes back when you click the highlight. **Ask AI instead** switches that same panel into the question composer, so nothing is lost.
+
+### Changed
+
+- **The highlighter covers exactly what you painted.** The band spans the left and right end of your stroke (clamped to the text it touched) instead of snapping to the whole line — swiping across the middle of a sentence highlights just that stretch.
+- **While you drag, you see your own stroke**: a translucent marker line at the text's height, which only turns into the clean band when you release.
+- The page status line no longer promises “Esc to undo” on a fresh highlight: with the note box open, Esc means cancel (untouched highlights are still removed by it).
+
+### Fixed
+
+- The note box's save confirmation had nowhere to appear — the status element only existed in the question composer.
+
 ## 1.0.8
 
 ### Changed

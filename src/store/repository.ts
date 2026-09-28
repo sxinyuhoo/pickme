@@ -300,10 +300,12 @@ export class AnnotationRepository {
 			const sourcePath = this.sourcePathOf(path, doc);
 			const sourceName = (sourcePath.split('/').pop() ?? sourcePath).replace(/\.md$/, '');
 			for (const entry of doc.entries) {
+				// 高亮可以带一句批注，索引里跟出来才找得到
+				const note = entry.note?.trim() ? ` · ${shorten(entry.note.trim(), 30)}` : '';
 				const selection =
 					entry.kind === 'pdf' && entry.pdf
-						? `第 ${entry.pdf.page} 页${shapeKindLabel(entry.pdf)}`
-						: shorten(entry.selection, 40);
+						? `第 ${entry.pdf.page} 页${shapeKindLabel(entry.pdf)}${note}`
+						: `${shorten(entry.selection, 40)}${note}`;
 				rows.push(
 					`| [[${sourceName}]] | \`${entry.id}\` | ${selection} | ${entry.status === 'ok' ? '有效' : '失效'} | ${entry.qas.length} | ${entry.created || doc.updated} |`,
 				);

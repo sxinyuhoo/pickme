@@ -3,6 +3,7 @@ import { t } from '../i18n.ts';
 import type PickmePlugin from '../main.ts';
 import { parseAnnotationDoc } from '../core/annotationDoc.ts';
 import { ConfirmModal } from './confirmModal.ts';
+import { shapesOf } from '../core/types.ts';
 import type { AnnotationDoc, AnnotationEntry } from '../core/types.ts';
 
 /**
@@ -40,7 +41,19 @@ export interface AskPanelOptions {
 	 * 关掉面板时如果一个问题都没问，就把它连同高亮一起撤销——用户看到的是「取消」。
 	 */
 	fresh?: boolean;
+	/**
+	 * 面板形态：'note' = 简单批注框，'ask' = AI 问答面板。
+	 * 不传就按批注自己判断——荧光笔高亮给批注框，框选区域给问答。
+	 */
+	mode?: 'ask' | 'note';
 	onClose?: () => void;
+}
+
+/** 这条批注是不是「纯荧光笔高亮」：全是 line 形状，没有框 */
+function isHighlightEntry(entry: AnnotationEntry | null): boolean {
+	if (!entry || entry.kind !== 'pdf' || !entry.pdf) return false;
+	const shapes = shapesOf(entry.pdf);
+	return shapes.length > 0 && shapes.every((shape) => shape.kind === 'line');
 }
 
 const PANEL_WIDTH = 380;
@@ -103,6 +116,9 @@ export class AskPanel implements AskSink {
 	private answerEls = new Map<string, HTMLElement>();
 	private closed = false;
 	private fresh = false;
+	/** 当前形态：用户点过「改问 AI」就固定成 'ask' */
+	private mode: 'ask' | 'note' | null = null;
+	private noteInput: HTMLTextAreaElement | null = null;
 	/** 面板当前贴在锚点的哪一侧；定下来就不再随锚点微动而翻边 */
 	private side: 'right' | 'left' | null = null;
 	/**
@@ -126,6 +142,7 @@ export class AskPanel implements AskSink {
 		this.resolveAnchor = options.resolveAnchor ?? (() => null);
 		this.fresh = options.fresh ?? false;
 		this.onClose = options.onClose ?? (() => undefined);
+		this.mode = options.mode ?? null;
 		this.child.load();
 	}
 
@@ -138,7 +155,7 @@ export class AskPanel implements AskSink {
 		this.applyPosition();
 		window.addEventListener('scroll', this.onViewportChange, true);
 		window.addEventListener('resize', this.onViewportChange);
-		this.questionInput?.focus();
+		(this.noteInput ?? this.questionInput)?.focus();
 	}
 
 	/**
@@ -167,10 +184,13 @@ export class AskPanel implements AskSink {
 	private async discardIfUntouched(): Promise<void> {
 		if (!this.fresh) return;
 		this.fresh = false;
+		// 写过批注的高亮不能因为关面板被撤销
 		try {
 			const doc = (await this.plugin.repository.loadFor(this.file)).doc;
 			const entry = doc.entries.find((item) => item.id === this.entryId);
 			if (!entry) return;
+			// 写过高亮批注：用户认下了这条高亮，关面板不能把它撤掉
+			if (entry.note?.trim()) return;
 			const asked = entry.qas.some((qa) => qa.question.trim() !== '' || qa.answer.trim() !== '');
 			if (asked) return;
 			await this.plugin.deleteEntry(this.entryId, this.file);
@@ -297,10 +317,65 @@ export class AskPanel implements AskSink {
 			root.createDiv({ cls: 'pickme-selection', text: shorten(selection, 160) });
 		}
 
-		this.renderComposer(root, entry);
-		this.renderHistory(root, entry);
+		if (this.mode === 'note' || (this.mode === null && isHighlightEntry(entry))) {
+			this.renderNoteBox(root, entry);
+			// 以前问过 AI 的高亮仍然把问答显示出来，别把已有内容藏起来
+			if (entry.qas.length) this.renderHistory(root, entry);
+		} else {
+			this.renderComposer(root, entry);
+			this.renderHistory(root, entry);
+		}
 		// 内容变了尺寸也变，重排后按锚点再校一次位置
 		this.applyPosition();
+	}
+
+	/**
+	 * 荧光笔的批注框：一句话备注就够，不牵扯 AI。
+	 * 想交给 AI 就点「改问 AI」，面板原地换成问答形态。
+	 */
+	private renderNoteBox(root: HTMLElement, entry: AnnotationEntry): void {
+		const box = root.createDiv({ cls: 'pickme-note' });
+		const input = box.createEl('textarea', { cls: 'pickme-note-input' });
+		this.noteInput = input;
+		input.rows = 3;
+		input.placeholder = t('写点批注…（⌘/Ctrl + Enter 保存）');
+		input.value = entry.note ?? '';
+
+		// 状态行要自己建：setStatus 写的是 this.statusEl，而问答表单里那个在批注形态下不存在
+		const status = box.createDiv({ cls: 'pickme-status' });
+		this.statusEl = status;
+
+		const row = box.createDiv({ cls: 'pickme-row' });
+		const save = row.createEl('button', { cls: 'mod-cta', text: t('保存批注') });
+		const ask = row.createEl('button', { text: t('改问 AI') });
+		ask.setAttribute('aria-label', t('把这条高亮交给 AI 提问'));
+		const remove = row.createEl('button', { cls: 'pickme-note-remove', text: t('删除这条高亮') });
+		remove.setAttribute('aria-label', t('连同这条高亮一起删掉'));
+
+		const saveNote = async () => {
+			const text = input.value.trim();
+			await this.plugin.saveNote(this.entryId, this.file, text);
+			// 存过就当成「认下了这条高亮」：关面板不再撤销它
+			this.fresh = false;
+			entry.note = text || undefined;
+			this.setStatus(text ? t('批注已保存') : t('批注已清空'));
+		};
+		input.addEventListener('keydown', (event) => {
+			if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+				event.preventDefault();
+				void saveNote();
+			}
+		});
+		save.onclick = () => void saveNote();
+		ask.onclick = () => {
+			this.mode = 'ask';
+			this.render();
+		};
+		remove.onclick = () => {
+			new ConfirmModal(this.plugin.app, t('连同高亮删掉这条批注？'), () => {
+				void this.plugin.deleteEntry(this.entryId, this.file).then(() => this.close('handover'));
+			}).open();
+		};
 	}
 
 	private renderComposer(root: HTMLElement, entry: AnnotationEntry): void {

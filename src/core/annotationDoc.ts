@@ -10,6 +10,8 @@ const STATUS_STALE = '失效';
 const HIT_TEXT_SECTION = '命中文本';
 /** 单行命中文本摘要的截断长度 */
 const HIT_TEXT_LIMIT = 120;
+/** 高亮备注的单行 bullet 截断长度 */
+const NOTE_LIMIT = 120;
 
 function entryStatusLabel(entry: AnnotationEntry): string {
 	return entry.status === 'ok' ? STATUS_OK : STATUS_STALE;
@@ -60,6 +62,12 @@ function hitTextSummary(text: string): string {
 	return oneLine.length > HIT_TEXT_LIMIT ? oneLine.slice(0, HIT_TEXT_LIMIT) : oneLine;
 }
 
+/** 备注的单行文本：换行折叠成空格，超长截断，保证落盘是单个 bullet */
+function noteSummary(text: string): string {
+	const oneLine = text.replace(/\s+/g, ' ').trim();
+	return oneLine.length > NOTE_LIMIT ? oneLine.slice(0, NOTE_LIMIT) : oneLine;
+}
+
 /** 单条批注渲染为 Markdown 片段 */
 export function renderEntry(entry: AnnotationEntry): string {
 	const lines: string[] = [`${ENTRY_HEAD}${entry.id}`, ''];
@@ -68,6 +76,8 @@ export function renderEntry(entry: AnnotationEntry): string {
 	if (entry.kind === 'text') {
 		lines.push(`- 选区：${entry.selection}`);
 	}
+	// 高亮备注：只在非空时落成单个 bullet，空备注不写，老文件逐字节不变
+	if (entry.note) lines.push(`- 备注：${noteSummary(entry.note)}`);
 	if (entry.pdf) lines.push(`- 形状：${shapeLabel(entry.pdf)}`);
 	lines.push(`- 锚点 id：${entry.id}`);
 	// 兜底：字段缺失时宁可不写，也不要在文件里留下 undefined 这种字面量
@@ -207,6 +217,9 @@ export function parseAnnotationDoc(text: string, selfPath: string): AnnotationDo
 			created: values.get('创建') ?? '',
 			qas: [],
 		};
+		// 高亮备注：没有这个 bullet 就保持 undefined，不凭空造字段
+		const note = (values.get('备注') ?? '').trim();
+		if (note) entry.note = note;
 		if (kind === 'pdf') {
 			entry.pdf = parsePdfInfo(values, sections, head);
 		}

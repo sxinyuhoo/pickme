@@ -309,3 +309,146 @@ test('解析容错：坏掉的坐标片段跳过，形状字段缺失时回退�
 		[0.5, 0.6, 0.7, 0.8],
 	]);
 });
+
+/* ---------- 高亮备注（note） ---------- */
+
+/**
+ * 加入 note 字段之前的渲染结果（sampleDoc 完整落盘），
+ * 用来钉死「无备注时逐字节不变」。
+ */
+const OLD_FORMAT_GOLDEN = [
+	'---',
+	'类型: pickme 批注',
+	'源文档: "[[空间检索论文]]"',
+	'源路径: 10-项目/论文/空间检索论文.md',
+	'源类型: markdown',
+	'批注版本: 1',
+	'创建: "2026-09-24T15:40:00+08:00"',
+	'更新: "2026-09-24T15:52:00+08:00"',
+	'批注条数: 2',
+	'---',
+	'',
+	'源文档：[[空间检索论文]]',
+	'',
+	'## 锚点 k7f3q2',
+	'',
+	'- 类型：文本',
+	'- 选区：本体驱动的全路网空间检索引擎',
+	'- 锚点 id：k7f3q2',
+	'- 定位指纹：a1b2c3d4',
+	'- 状态：有效',
+	'- 创建：2026-09-24T15:40:00+08:00',
+	'',
+	'### 提问',
+	'',
+	'这句话的核心贡献是什么？',
+	'',
+	'### 模板',
+	'',
+	'解释',
+	'',
+	'### 回答',
+	'',
+	'一句话结论：',
+	'',
+	'- 要点一',
+	'- 要点二',
+	'',
+	'### 追问 1',
+	'',
+	'问：与已有工作的差异在哪。',
+	'答：差异在于……',
+	'',
+	'## 锚点 m1p8x4',
+	'',
+	'- 类型：PDF 区域',
+	'- 形状：框',
+	'- 锚点 id：m1p8x4',
+	'- 定位指纹：f0e1d2c3',
+	'- 状态：失效',
+	'- 创建：2026-09-24T15:50:00+08:00',
+	'- 页码：12',
+	'- 页面尺寸：595x842',
+	'- 矩形：100,200,300,260',
+	'- 归一化矩形：0.1681,0.2375,0.5042,0.3088',
+	'- 框：100,200,300,260',
+	'- 归一化框：0.1681,0.2375,0.5042,0.3088',
+	'- 命中文本：最大纵坡不应大于',
+	'',
+	'![[30-批注/_assets/行业标准.pdf.md/2.png]]',
+	'',
+	'### 命中文本',
+	'',
+	'最大纵坡不应大于',
+	'',
+	'### 提问',
+	'',
+	'这段规范要求了什么？',
+	'',
+	'### 模板',
+	'',
+	'（直接提问）',
+	'',
+	'### 回答',
+	'',
+	'要求……',
+	'',
+].join('\n');
+
+test('带备注的高亮：备注落成单行 bullet，往返后回到 entry.note', () => {
+	const doc = sampleDoc();
+	doc.entries = [pdfEntry({ hitText: '最大纵坡不应大于' })];
+	doc.entries[0].note = '这段是强制条文，施工图必须复核';
+
+	const text = renderAnnotationDoc(doc);
+	const noteLine = '- 备注：这段是强制条文，施工图必须复核';
+	assert.ok(text.includes(noteLine), '备注要落成「- 备注：」bullet');
+	// 位置在「- 类型：」之后
+	const rows = text.split('\n');
+	assert.ok(rows.indexOf(noteLine) > rows.indexOf('- 类型：PDF 区域'), '备注排在类型之后');
+
+	const parsed = parseAnnotationDoc(text, doc.selfPath);
+	assert.equal(parsed.entries[0].note, '这段是强制条文，施工图必须复核');
+});
+
+test('备注里的换行折成空格、超长截断，落盘仍是单行', () => {
+	const doc = sampleDoc();
+	doc.entries = [pdfEntry({})];
+	doc.entries[0].note = `第一行\n第二行	第三行${'甲'.repeat(200)}`;
+
+	const text = renderAnnotationDoc(doc);
+	const noteLine = text.split('\n').find((line) => line.startsWith('- 备注：')) ?? '';
+	// 一个换行/制表符都没留下，且截断到 120 字
+	assert.ok(!noteLine.includes('	'), '制表符应当折成空格');
+	assert.equal(noteLine.length, '- 备注：'.length + 120, '备注截断到 120 字');
+	assert.equal(noteLine.slice(0, '- 备注：'.length + 11), '- 备注：第一行 第二行 第三行');
+	// 解析回来就是这条单行摘要
+	assert.equal(parseAnnotationDoc(text, doc.selfPath).entries[0].note, noteLine.slice('- 备注：'.length));
+});
+
+test('没有备注时渲染结果与旧格式逐字节一致', () => {
+	const text = renderAnnotationDoc(sampleDoc());
+	assert.ok(!text.includes('备注'), '无备注时不该渲染出任何备注行');
+	assert.equal(text, OLD_FORMAT_GOLDEN);
+});
+
+test('解析：读到「- 备注：」写回 note，没有该 bullet 时 note 保持 undefined', () => {
+	const withNote = [
+		'## 锚点 n001',
+		'',
+		'- 类型：PDF 区域',
+		'- 备注：只有一句话',
+		'- 锚点 id：n001',
+		'',
+	].join('\n');
+	assert.equal(parseAnnotationDoc(withNote, 'x.md').entries[0].note, '只有一句话');
+
+	const withoutNote = [
+		'## 锚点 n002',
+		'',
+		'- 类型：PDF 区域',
+		'- 锚点 id：n002',
+		'',
+	].join('\n');
+	assert.equal(parseAnnotationDoc(withoutNote, 'x.md').entries[0].note, undefined);
+});

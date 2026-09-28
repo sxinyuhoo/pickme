@@ -225,7 +225,13 @@ export class PickmePdfView extends FileView {
 	 * 在当前 PDF 页面内打开提问面板。
 	 * 交互全部留在页面上，侧边栏只负责查看已有批注，日常不必打开。
 	 */
-	openAskPanel(entryId: string, anchorSlot?: PageSlot | null, screenRect?: Rect, fresh = false): void {
+	openAskPanel(
+		entryId: string,
+		anchorSlot?: PageSlot | null,
+		screenRect?: Rect,
+		fresh = false,
+		mode?: 'ask' | 'note',
+	): void {
 		const file = this.file;
 		if (!file) return;
 		this.panelSeq += 1;
@@ -243,6 +249,7 @@ export class PickmePdfView extends FileView {
 			file,
 			entryId,
 			fresh,
+			mode,
 			resolveAnchor: this.resolvePanelAnchor,
 			onClose: () => {
 				// 已经有更新的面板接管了（点同一条再看一眼、或换了一条）：
@@ -1210,25 +1217,45 @@ export class PickmePdfView extends FileView {
 		return pdfToScreenRect(line.rect, this.slotSize(slot), this.viewSizeOf(slot), this.rotationOf(slot));
 	}
 
-	/** 拖动过程中实时画吸附结果：松手不改变已经看到的东西 */
+	/**
+	 * 拖动中画的是你**真实划出来的笔迹**（自由笔刷），松手之后才吸附成规整行带。
+	 * 先给手感、再给结果：划的时候能看到笔跑到哪，抬起手才变成干净的直线色带。
+	 */
 	private renderStrokePreview(slot: PageSlot): void {
-		slot.preview.empty();
-		const lines = this.snappedLines(slot);
-		if (!lines.length) {
-			slot.preview.hide();
+		const preview = slot.preview;
+		preview.empty();
+		const points = this.strokePoints;
+		if (points.length < 2) {
+			preview.hide();
 			return;
 		}
-		slot.preview.show();
-		for (const line of lines) {
-			const rect = this.lineScreenRect(slot, line);
-			const band = slot.preview.createDiv({ cls: 'pickme-pdf-band' });
-			band.setCssProps({
-				left: `${rect[0]}px`,
-				top: `${rect[1]}px`,
-				width: `${Math.max(2, rect[2] - rect[0])}px`,
-				height: `${Math.max(2, rect[3] - rect[1])}px`,
-			});
+		preview.show();
+		const size = this.slotSize(slot);
+		const svg = preview.createSvg('svg', { cls: 'pickme-pdf-ink' });
+		svg.setAttribute('viewBox', `0 0 ${size[0]} ${size[1]}`);
+		const path = svg.createSvg('path');
+		path.setAttribute('d', points.map((point, index) => `${index ? 'L' : 'M'}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' '));
+		// 笔迹粗细照这页文字的字高来，划出来就是一支真荧光笔
+		path.setAttribute('stroke-width', String(Math.max(6, this.inkHeightOf(slot))));
+		path.setAttribute('stroke-linecap', 'round');
+		path.setAttribute('stroke-linejoin', 'round');
+		path.setAttribute('fill', 'none');
+	}
+
+	/** 这一页正文的字高（取出现最多的那一档），用来定自由笔迹的粗细 */
+	private inkHeightOf(slot: PageSlot): number {
+		const counts = new Map<number, number>();
+		for (const item of slot.text) {
+			if (!item.str.trim()) continue;
+			const key = Math.round(item.height);
+			counts.set(key, (counts.get(key) ?? 0) + 1);
 		}
+		let best = 0;
+		let bestCount = 0;
+		for (const [height, count] of counts) {
+			if (count > bestCount) { best = height; bestCount = count; }
+		}
+		return best || 12;
 	}
 
 	/** 荧光笔建批注：每行一个 line 形状，外接矩形留给面板定位、索引与老版本回显 */
@@ -1250,7 +1277,7 @@ export class PickmePdfView extends FileView {
 		];
 		const hitText = linesText(lines);
 		const preview = hitText.replace(/\s+/g, ' ').slice(0, 40);
-		this.setStatus(t('已高亮：{v0}（Esc 撤销）', { v0: preview }));
+		this.setStatus(t('已高亮：{v0}', { v0: preview }));
 
 		const id = newAnchorId();
 		const entry: AnnotationEntry = {
@@ -1277,10 +1304,11 @@ export class PickmePdfView extends FileView {
 
 		await this.plugin.repository.addEntry(file, entry);
 		await this.drawMarksFor(slot);
-		// 荧光笔的语义就是「高亮」本身：不弹提问面板，也不跳侧边栏。
-		// 想就这一段问点什么，点一下这条高亮即可（和点已有批注是同一条路）。
-		// 记下它只是为了刚划完的十几秒里能用 Esc 收回一次笔误。
+		// 荧光笔的语义就是「高亮 + 一句话批注」：划完给的是批注框，不是 AI 问答框。
+		// 想要 AI 就在批注框里点「改问 AI」。记下它只是为了刚划完能用 Esc 收回一次笔误。
 		this.freshHighlight = { id, slot, at: Date.now() };
+		const screenRect = this.lineScreenRect(slot, { rect: box, items: [] });
+		this.openAskPanel(id, slot, screenRect, true, 'note');
 	}
 
 	/** 刚划完的那条高亮：只为 Esc 撤销而记，过了时间窗或已被问过就不动它 */

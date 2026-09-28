@@ -195,8 +195,67 @@ test('横向只覆盖半行：右边界吸到笔迹覆盖处，不吸整行', ()
 		['最大纵坡', '不应大于'],
 	);
 	close(lines[0].rect[0], 20, '左边界');
-	// 命中项右边界 = 62 + 40 = 102；整行右边界是 116，没有被吸进来
-	close(lines[0].rect[2], 102, '右边界');
+	// 笔迹划到 78 收笔：右边界吸到笔迹覆盖处 78 + 1pt 容差，
+	// 命中项右边界 102、整行右边界 116 都没被铺满
+	close(lines[0].rect[2], 79, '右边界');
+});
+
+test('横向划多少算多少：笔迹只覆盖单个文字项中间一小段', () => {
+	// 一行就是一个长 item，笔迹只压中间一小段，行带不铺满整项
+	const items = [box('最大纵坡不应大于 3%', 100, 200, 200, 12)];
+	const lines = strokeToLines(items, stroke([[160, 202], [200, 202]]));
+	assert.equal(lines.length, 1);
+	// 起止就是笔迹覆盖的左右端点（各留 1pt 容差），远窄于文字项 [100, 300]
+	close(lines[0].rect[0], 159, '左边界');
+	close(lines[0].rect[2], 201, '右边界');
+	assert.ok(lines[0].rect[2] - lines[0].rect[0] < 200, '行带应明显窄于文字项');
+	assert.equal(linesText(lines), '最大纵坡不应大于 3%');
+});
+
+test('横向划满整项并超出两端：行带等于文字项范围，超出被夹住', () => {
+	const items = [box('最大纵坡不应大于 3%', 100, 200, 120, 12)];
+	// 起点在项左端之外，终点在右端之外
+	const lines = strokeToLines(items, stroke([[40, 202], [320, 202]]));
+	assert.equal(lines.length, 1);
+	close(lines[0].rect[0], 100, '左边界夹到项左端');
+	close(lines[0].rect[2], 220, '右边界夹到项右端');
+});
+
+test('同一行两个文字项：笔迹只压到其中一个的一部分', () => {
+	const items = [
+		box('前半句', 20, 80, 40, 10), // 范围 [20, 60]
+		box('后半句', 62, 80, 40, 10), // 范围 [62, 102]
+	];
+	// 笔迹只在第二个项中段落笔，完全没碰到第一个项
+	const lines = strokeToLines(items, stroke([[72, 82], [92, 82]]));
+	assert.equal(lines.length, 1);
+	assert.deepEqual(
+		lines[0].items.map((item) => item.str),
+		['后半句'],
+	);
+	// 行带只覆盖笔迹落点：既不含未命中的「前半句」，也没铺满整个「后半句」
+	close(lines[0].rect[0], 71, '左边界');
+	close(lines[0].rect[2], 93, '右边界');
+	assert.ok(lines[0].rect[0] > 62, '行带左端应落在第二个项内部');
+	assert.ok(lines[0].rect[2] < 102, '行带右端不该铺满整个项');
+});
+
+test('笔迹划在文字项之外的部分不能把行带拉长', () => {
+	// 右邻项与左项间距远超断开阈值（140 > 30），属于另一段
+	const items = [
+		box('最大纵坡', 100, 200, 60, 12), // [100, 160]
+		box('不应大于', 300, 200, 60, 12), // [300, 360]
+	];
+	// 笔迹右段划到 x=190，已经超出左项右端 160
+	const lines = strokeToLines(items, stroke([[150, 202], [190, 202]]));
+	assert.equal(lines.length, 1);
+	assert.deepEqual(
+		lines[0].items.map((item) => item.str),
+		['最大纵坡'],
+	);
+	// 超出左项的部分被夹住，行带右端停在 160，没被拖到 x=360
+	close(lines[0].rect[0], 149, '左边界');
+	close(lines[0].rect[2], 160, '右边界夹到项右端');
 });
 
 test('空白处划线返回空数组', () => {

@@ -135,6 +135,12 @@ const ITEM_GAP_MIN = 18;
 /** 字高的兜底值，与 joinItemText 里 max(height, 4) 的口径一致 */
 const MIN_TEXT_HEIGHT = 4;
 
+/** 行带横向的外扩容差：笔迹起止点各向外留一点，免得文字边缘差一丝没盖住 */
+const HIGHLIGHT_PAD = 1;
+
+/** 行带最小横向宽度：竖划或极短笔迹也要给出一个能看见的宽度，避免零宽行带 */
+const HIGHLIGHT_MIN_WIDTH = 4;
+
 /** 沿折线每 step 补一个采样点，保证相邻点之间的线段足够短 */
 function resampleStroke(points: StrokePoint[], step: number): StrokePoint[] {
 	const out: StrokePoint[] = [{ x: points[0].x, y: points[0].y }];
@@ -260,13 +266,34 @@ function splitRuns(items: TextItemBox[]): TextItemBox[][] {
 }
 
 /**
+ * 笔迹落在某一行带内的横向跨度（min x / max x）。
+ * 只按纵向带过滤：横向划出文字项之外的部分留给调用处夹回命中项范围。
+ * 一个采样点都没落进带内时返回 null，调用处退回命中项的整段范围。
+ */
+function strokeSpanInBand(
+	sampled: StrokePoint[],
+	bottom: number,
+	top: number,
+): [number, number] | null {
+	let min = Infinity;
+	let max = -Infinity;
+	for (const point of sampled) {
+		if (point.y < bottom || point.y > top) continue;
+		if (point.x < min) min = point.x;
+		if (point.x > max) max = point.x;
+	}
+	return min <= max ? [min, max] : null;
+}
+
+/**
  * 一笔笔迹 → 吸附后的行框，按阅读顺序（先上后下、再左到右）。
  * items 是整页的文字项，points 是笔迹采样点，两者都在 PDF 用户空间。
  * 空白处、单击（点数 < 2）、短到只剩手抖的笔迹都返回空数组。
  */
 export function strokeToLines(items: TextItemBox[], points: StrokePoint[]): LineBox[] {
 	if (points.length < 2) return [];
-	const stroke = trimStrokeEnds(resampleStroke(points, STROKE_SAMPLE_STEP), STROKE_TRIM);
+	const sampled = resampleStroke(points, STROKE_SAMPLE_STEP);
+	const stroke = trimStrokeEnds(sampled, STROKE_TRIM);
 	if (stroke.length < 2) return [];
 	const hit = items.filter((item) => item.str.trim() !== '' && strokeHitsItem(item, stroke));
 	if (hit.length === 0) return [];
@@ -278,9 +305,27 @@ export function strokeToLines(items: TextItemBox[], points: StrokePoint[]): Line
 			const height = Math.max(...run.map((item) => item.height), MIN_TEXT_HEIGHT);
 			// 基线取行内字高最大的那一项（主字号），免得下标把整条带往下拖
 			const base = run.reduce((best, item) => (item.height > best.height ? item : best), run[0]).y;
-			// 横向只覆盖命中项，不做整行吸附
-			const x0 = Math.min(...run.map((item) => item.x));
-			const x1 = Math.max(...run.map((item) => item.x + item.width));
+			// 横向只覆盖命中项范围（双栏断开后的一段）
+			const itemLeft = Math.min(...run.map((item) => item.x));
+			const itemRight = Math.max(...run.map((item) => item.x + item.width));
+			// 笔迹在本行带上的横向跨度，再夹进命中项范围：划多少算多少，不整项铺满
+			const span = strokeSpanInBand(
+				sampled,
+				base - height * BAND_BOTTOM - HIT_TOLERANCE,
+				base + height * BAND_TOP + HIT_TOLERANCE,
+			);
+			let x0 = itemLeft;
+			let x1 = itemRight;
+			if (span) {
+				x0 = Math.max(itemLeft, span[0] - HIGHLIGHT_PAD);
+				x1 = Math.min(itemRight, span[1] + HIGHLIGHT_PAD);
+			}
+			// 竖划或极短笔迹会算出零宽，撑到最小宽度后再夹回命中项范围
+			if (x1 - x0 < HIGHLIGHT_MIN_WIDTH) {
+				const mid = (x0 + x1) / 2;
+				x0 = Math.max(itemLeft, mid - HIGHLIGHT_MIN_WIDTH / 2);
+				x1 = Math.min(itemRight, mid + HIGHLIGHT_MIN_WIDTH / 2);
+			}
 			lines.push({
 				rect: [x0, base - height * BAND_BOTTOM, x1, base + height * BAND_TOP],
 				items: run,

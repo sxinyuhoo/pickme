@@ -533,6 +533,32 @@ body.pickme-mark-border .pickme-mark {
 	box-shadow: var(--shadow-s);
 }
 
+/* 荧光笔的批注框：一句话备注，不是问答 */
+.pickme-note {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.pickme-note-input {
+	width: 100%;
+	min-height: 56px;
+	resize: vertical;
+	font-family: inherit;
+	font-size: var(--font-ui-small);
+}
+
+.pickme-note-text {
+	margin-top: 2px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-style: italic;
+}
+
+.pickme-note-remove {
+	color: var(--text-error);
+}
+
 .pickme-pdf-canvas {
 	display: block;
 }
@@ -563,8 +589,18 @@ body.pickme-mark-border .pickme-mark {
 	pointer-events: none;
 }
 
-.pickme-pdf-preview .pickme-pdf-band {
-	opacity: 0.75;
+.pickme-pdf-ink {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+}
+
+/* 拖动中的自由笔迹：就是用户划出来的样子（半透明荧光笔），松手才吸附成规整色带 */
+.pickme-pdf-ink path {
+	stroke: color-mix(in srgb, var(--pickme-highlight) 55%, transparent);
+	fill: none;
 }
 
 /* 一条批注的容器：只占它的外接矩形，自己不吃指针事件（空白处点不开批注） */

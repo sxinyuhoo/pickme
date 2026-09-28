@@ -830,6 +830,12 @@ export default class PickmePlugin extends Plugin {
 		await this.refreshViews();
 	}
 
+	/** 荧光笔高亮的简单批注：只改这条的备注，不牵扯 AI 问答 */
+	async saveNote(id: string, file: TFile, note: string): Promise<void> {
+		await this.repository.updateEntry(file, id, { note: note || undefined });
+		await this.refreshViews();
+	}
+
 	async deleteEntry(id: string, source?: TFile): Promise<void> {
 		const file = source ?? this.activeFile();
 		if (!file) return;
