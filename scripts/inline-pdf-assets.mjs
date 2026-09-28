@@ -50,8 +50,11 @@ function pack(dir, suffix) {
 		offset += data.length;
 	}
 	const raw = Buffer.concat(chunks);
-	// mtime 固定为 0（zlib 默认），保证同样的输入产出同样的字节，构建可复现
+	// gzip 头的 MTIME 固定 0（zlib 默认），OS 字节再统一成 3（Unix）：
+	// 否则 macOS 写 0x13、Linux 写 0x03，同一份源码在两台机器上会产出不同字节，
+	// 「构建可复现」这条就形同虚设。除这个头字节外，deflate 部分由 zlib 版本决定。
 	const gz = zlib.gzipSync(raw, { level: 9 });
+	gz[9] = 3;
 	return { index, base64: gz.toString('base64'), rawSize: raw.length, gzipSize: gz.length };
 }
 
