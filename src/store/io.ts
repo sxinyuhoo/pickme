@@ -200,7 +200,10 @@ export class FileIO {
 			if (!(await this.dirExists(clean))) return;
 			const listed = await this.app.vault.adapter.list(clean);
 			if (listed.files.length > 0 || listed.folders.length > 0) return;
-			await this.app.vault.adapter.rmdir(clean, false);
+			// 第二个参数必须为 true：真实 Obsidian 的 adapter.rmdir 走 fs.rm 语义，
+			// 对目录传 false 会抛 `EISDIR (is a directory)`——哪怕目录是空的，
+			// 于是清理会被下面的 catch 静默吞掉（真机上撞到过）。空目录已在上一步确认。
+			await this.app.vault.adapter.rmdir(clean, true);
 		} catch {
 			// 还有东西、或已被别处删掉，都不算错
 		}

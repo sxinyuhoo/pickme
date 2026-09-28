@@ -79,15 +79,16 @@ export function createObsidianStub() {
 				mkdir: async (p) => {
 					this.folders.add(norm(p));
 				},
-				// 与真实 Obsidian 一致：recursive 为 false 时目录非空就抛错
+				// 与真实 Obsidian 一致：它的 rmdir 走 fs.rm 语义——目录必须带 recursive，
+				// 传 false 会抛 `EISDIR (is a directory)`，哪怕目录是空的。
+				// （桩件一开始写成「非空才抛」，单测因此放过了一个真机上必挂的调用。）
 				rmdir: async (p, recursive = false) => {
 					const key = norm(p);
-					if (!this.folders.has(key)) return;
-					const prefix = key ? `${key}/` : '';
-					const hasChild = [...this.files.keys()].some((f) => f.startsWith(prefix))
-						|| [...this.folders].some((f) => f !== key && f.startsWith(prefix));
-					if (hasChild && !recursive) throw new Error('Directory not empty');
-					if (!key) return;
+					if (!key || !this.folders.has(key)) return;
+					if (!recursive) throw new Error(`Path is a directory: rm returned EISDIR (is a directory) ${key}`);
+					const prefix = `${key}/`;
+					for (const f of [...this.files.keys()]) if (f.startsWith(prefix)) this.files.delete(f);
+					for (const f of [...this.folders]) if (f !== key && f.startsWith(prefix)) this.folders.delete(f);
 					this.folders.delete(key);
 				},
 			};

@@ -1,6 +1,6 @@
 {
   "name": "pickme",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "选中或框选后即时问答批注的 Obsidian 插件",
   "private": true,
   "type": "module",

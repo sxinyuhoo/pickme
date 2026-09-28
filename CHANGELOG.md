@@ -2,6 +2,16 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.0.5
+
+### Fixed
+
+- The empty-folder cleanup shipped in 1.0.4 never actually ran. Obsidian's `adapter.rmdir` follows `fs.rm` semantics: passing `recursive: false` for a directory throws `EISDIR (is a directory)` even when the folder is empty, and the cleanup swallowed that error. Deleting or cancelling an annotation now really does remove the leftover `_assets/<document>.md/` folder.
+
+### Changed
+
+- The smoke-test stub for `adapter.rmdir` now mirrors the real behaviour (it throws unless `recursive` is set), so this class of stub-vs-reality mismatch fails the build instead of shipping.
+
 ## 1.0.4
 
 ### Fixed
