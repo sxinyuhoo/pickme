@@ -2,6 +2,17 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.0.4
+
+### Fixed
+
+- Deleting or cancelling a PDF annotation no longer leaves an empty `_assets/<document>.md/` folder behind. When the last region screenshot of a document goes away, the empty folder is removed with it; a folder that still holds screenshots is left untouched.
+
+### Changed
+
+- The generated `src/generated/pdfAssets.ts` is now committed to the repository. The automated plugin review runs its static analysis before any build step, and an import it cannot resolve degrades to `any` — which surfaced as ten spurious `unsafe-*` findings against the pdf.js resource lookups. Regeneration is deterministic and CI fails if it drifts from `pdfjs-dist`.
+- The gzip header written by the asset packer no longer carries the platform byte, so the same source produces the same `main.js` on macOS and on Linux. Release artifacts are now byte-identical to a local build.
+
 ## 1.0.3
 
 ### Changed
