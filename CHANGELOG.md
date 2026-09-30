@@ -2,6 +2,18 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.0.10
+
+### Added
+
+- **Continued highlighting merges.** Start a stroke on an existing highlight (or on the line right above/below it) and that stroke is appended to it instead of creating a second annotation — so reading down a paragraph and swiping line by line builds one multi-line highlight. No panel opens for a continuation, because it is not a new annotation.
+- **A mostly vertical stroke highlights the whole line.** Dragging straight down across a few lines used to leave a 4pt sliver on each; now each of those lines is highlighted end to end. Short horizontal swipes are unaffected and still cover exactly what you painted.
+
+### Changed
+
+- **Finishing a highlighter stroke opens nothing.** The default result of a stroke is a plain highlight; the note box appears when you click the highlight. (1.0.9 opened it automatically — that was one step too eager.)
+- `Escape` right after a stroke undoes it: a new highlight is removed, while a merged stroke is rolled back out of the existing highlight without touching the rest of it.
+
 ## 1.0.9
 
 ### Added

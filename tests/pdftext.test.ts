@@ -304,3 +304,62 @@ test('吸附结果按先上后下、再左到右排序', () => {
 		['左栏', '右栏', '下一行'],
 	);
 });
+
+/* ---------- 竖向为主的一笔 = 整行 ---------- */
+
+test('荧光笔竖划跨 3 行：每行铺满该行文字，不再是几 pt 的细条', () => {
+	const items = [
+		box('第一行文字', 100, 300, 80, 12),
+		box('第二行文字', 100, 280, 80, 12),
+		box('第三行文字', 100, 260, 80, 12),
+	];
+	// 竖线横坐标 130 落在三项之内，纵向从 310 划到 250，跨过 3 行的行带
+	const lines = strokeToLines(items, stroke([[130, 310], [130, 250]]));
+	assert.deepEqual(
+		lines.map((line) => line.items[0].str),
+		['第一行文字', '第二行文字', '第三行文字'],
+	);
+	// 每行横向都铺满命中项范围 [100, 180]，而不是 4pt 细条
+	for (const line of lines) {
+		close(line.rect[0], 100, `${line.items[0].str} 左边界`);
+		close(line.rect[2], 180, `${line.items[0].str} 右边界`);
+	}
+});
+
+test('横向短划仍按笔迹跨度：竖向规则不误伤横向笔迹', () => {
+	const items = [box('最大纵坡不应大于 3%', 100, 200, 120, 12)];
+	// 只有 15pt 的横划，纵向跨度为 0，不该被「竖向为主」规则铺满整行
+	const lines = strokeToLines(items, stroke([[160, 202], [175, 202]]));
+	assert.equal(lines.length, 1);
+	close(lines[0].rect[0], 159, '左边界');
+	close(lines[0].rect[2], 176, '右边界');
+	assert.ok(lines[0].rect[2] - lines[0].rect[0] < 120, '行带应远窄于文字项');
+});
+
+test('竖向规则临界值触发侧：纵向恰好 2×横向 + 字高 → 铺满整行', () => {
+	const items = [
+		box('第一行文字', 100, 300, 80, 12),
+		box('第二行文字', 100, 280, 80, 12),
+	];
+	// 纵向跨度 40，横向跨度 14：40 >= 2*14 + 12 = 40，恰好达标
+	const lines = strokeToLines(items, stroke([[130, 310], [144, 270]]));
+	assert.equal(lines.length, 2);
+	close(lines[0].rect[0], 100, '左边界铺满');
+	close(lines[0].rect[2], 180, '右边界铺满');
+	close(lines[1].rect[0], 100, '第二行左边界铺满');
+	close(lines[1].rect[2], 180, '第二行右边界铺满');
+});
+
+test('竖向规则临界值未触发侧：纵向不足 2×横向 + 字高 → 退回笔迹跨度', () => {
+	const items = [
+		box('第一行文字', 100, 300, 80, 12),
+		box('第二行文字', 100, 280, 80, 12),
+	];
+	// 横向跨度 15：40 >= 2*15 + 12 = 42 不成立，仍按笔迹跨度吸附
+	const lines = strokeToLines(items, stroke([[130, 310], [145, 270]]));
+	assert.equal(lines.length, 2);
+	assert.ok(lines[0].rect[2] - lines[0].rect[0] < 80, '行带应窄于整行');
+	close(lines[0].rect[0], 129, '左边界为笔迹跨度左端');
+	assert.ok(lines[0].rect[2] < 180, '右边界未铺满整行');
+});
+

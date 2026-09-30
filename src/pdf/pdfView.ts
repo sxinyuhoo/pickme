@@ -13,6 +13,8 @@ import type { Rect } from '../core/pdfgeom.ts';
 import { fingerprint, newAnchorId } from '../core/anchor.ts';
 import { nowIso } from '../util.ts';
 import { shapeKindLabel, shapesOf } from '../core/types.ts';
+import { mergeBandRects, mergeHitText, pickMergeTarget } from '../core/pdfmerge.ts';
+import type { MergeTarget } from '../core/pdfmerge.ts';
 import type { AnnotationEntry, PdfAnchorInfo, PdfShape } from '../core/types.ts';
 import { askPanelOf, openAskPanel as mountAskPanel } from '../ui/askPanel.ts';
 import type { AskPanelAnchor } from '../ui/askPanel.ts';
@@ -1065,6 +1067,8 @@ export class PickmePdfView extends FileView {
 		const end = this.relativePoint(slot, event);
 		if (this.plugin.settings.pdfAnnotateMode === 'highlight') {
 			this.strokePoints.push(end);
+			// 合并续划要看起笔落在哪（清空之前先取出来）
+			const strokeStart = this.toPdfPoint(slot, this.strokePoints[0]);
 			const lines = this.snappedLines(slot);
 			this.strokePoints = [];
 			if (!lines.length) {
@@ -1072,7 +1076,7 @@ export class PickmePdfView extends FileView {
 				this.setStatus(t('这里没有可取的文字，切到框选可框选区域'));
 				return;
 			}
-			await this.createHighlightAnnotation(slot, lines);
+			await this.createHighlightAnnotation(slot, lines, strokeStart);
 			return;
 		}
 		const screenRect = dragRect(start, end);
@@ -1212,11 +1216,6 @@ export class PickmePdfView extends FileView {
 		return strokeToLines(items, points);
 	}
 
-	/** 行框换算成屏幕矩形 */
-	private lineScreenRect(slot: PageSlot, line: LineBox): Rect {
-		return pdfToScreenRect(line.rect, this.slotSize(slot), this.viewSizeOf(slot), this.rotationOf(slot));
-	}
-
 	/**
 	 * 拖动中画的是你**真实划出来的笔迹**（自由笔刷），松手之后才吸附成规整行带。
 	 * 先给手感、再给结果：划的时候能看到笔跑到哪，抬起手才变成干净的直线色带。
@@ -1258,10 +1257,55 @@ export class PickmePdfView extends FileView {
 		return best || 12;
 	}
 
+	/**
+	 * 续划合并：起笔落在已有高亮上（或紧邻它上/下一行）时，把这一笔并进那条高亮。
+	 * 边读边逐行划会自然合成一条跨行高亮，而且**不弹任何面板**——它不是新批注。
+	 * 返回 true 表示已经并入，调用方不必再新建。
+	 */
+	private async appendToExistingHighlight(slot: PageSlot, lines: LineBox[], strokeStart: Point): Promise<boolean> {
+		const file = this.file;
+		if (!file) return false;
+		const lineHeight = this.inkHeightOf(slot);
+		const { doc } = await this.plugin.repository.loadFor(file);
+		const targets: MergeTarget[] = [];
+		for (const item of doc.entries) {
+			if (item.kind !== 'pdf' || !item.pdf || item.pdf.page !== slot.index) continue;
+			targets.push({ id: item.id, page: item.pdf.page, bands: shapesOf(item.pdf).map((shape) => shape.rect) });
+		}
+		const targetId = pickMergeTarget(targets, slot.index, strokeStart, lineHeight);
+		if (!targetId) return false;
+		const entry = doc.entries.find((item) => item.id === targetId);
+		if (!entry || !entry.pdf) return false;
+
+		const viewSize = this.viewSizeOf(slot);
+		const bands = mergeBandRects(shapesOf(entry.pdf).map((shape) => shape.rect), lines.map((line) => line.rect), lineHeight);
+		const shapes: PdfShape[] = bands.map((rect) => ({ kind: 'line', rect, norm: toNormalized(rect, viewSize) }));
+		const box: Rect = [
+			Math.min(...bands.map((rect) => rect[0])),
+			Math.min(...bands.map((rect) => rect[1])),
+			Math.max(...bands.map((rect) => rect[2])),
+			Math.max(...bands.map((rect) => rect[3])),
+		];
+		const hitText = mergeHitText(entry.pdf.hitText ?? '', linesText(lines));
+		// 快照留给 Esc：续划撤销只把这一笔还回去，不删整条高亮
+		const snapshot = { ...entry.pdf };
+		await this.plugin.repository.updateEntry(file, entry.id, {
+			pdf: { ...entry.pdf, rect: box, normRect: toNormalized(box, viewSize), shapes, hitText },
+			fingerprint: fingerprint(hitText || `p${slot.index}:${box.join(',')}`),
+		});
+		await this.drawMarksFor(slot);
+		this.freshHighlight = { id: entry.id, slot, at: Date.now(), snapshot };
+		this.setStatus(t('已并入上一条高亮（共 {v0} 行）', { v0: bands.length }));
+		return true;
+	}
+
 	/** 荧光笔建批注：每行一个 line 形状，外接矩形留给面板定位、索引与老版本回显 */
-	private async createHighlightAnnotation(slot: PageSlot, lines: LineBox[]): Promise<void> {
+	private async createHighlightAnnotation(slot: PageSlot, lines: LineBox[], strokeStart: Point): Promise<void> {
 		const file = this.file;
 		if (!file) return;
+		// 起笔落在已有高亮上（或紧邻它上下 1.5 倍字高）：并进那一条，不新建
+		const merged = await this.appendToExistingHighlight(slot, lines, strokeStart);
+		if (merged) return;
 		const viewSize = this.viewSizeOf(slot);
 		const rotation = this.rotationOf(slot);
 		const shapes: PdfShape[] = lines.map((line) => ({
@@ -1277,7 +1321,7 @@ export class PickmePdfView extends FileView {
 		];
 		const hitText = linesText(lines);
 		const preview = hitText.replace(/\s+/g, ' ').slice(0, 40);
-		this.setStatus(t('已高亮：{v0}', { v0: preview }));
+		this.setStatus(t('已高亮：{v0}（Esc 撤销）', { v0: preview }));
 
 		const id = newAnchorId();
 		const entry: AnnotationEntry = {
@@ -1304,23 +1348,30 @@ export class PickmePdfView extends FileView {
 
 		await this.plugin.repository.addEntry(file, entry);
 		await this.drawMarksFor(slot);
-		// 荧光笔的语义就是「高亮 + 一句话批注」：划完给的是批注框，不是 AI 问答框。
-		// 想要 AI 就在批注框里点「改问 AI」。记下它只是为了刚划完能用 Esc 收回一次笔误。
+		// 荧光笔划完就只是高亮：不弹任何面板。想写批注，点一下这条高亮即可。
+		// 记下它只是为了刚划完能用 Esc 收回一次笔误。
 		this.freshHighlight = { id, slot, at: Date.now() };
-		const screenRect = this.lineScreenRect(slot, { rect: box, items: [] });
-		this.openAskPanel(id, slot, screenRect, true, 'note');
 	}
 
 	/** 刚划完的那条高亮：只为 Esc 撤销而记，过了时间窗或已被问过就不动它 */
-	private freshHighlight: { id: string; slot: PageSlot; at: number } | null = null;
+	private freshHighlight: { id: string; slot: PageSlot; at: number; snapshot?: NonNullable<AnnotationEntry['pdf']> } | null = null;
 
 	/** Esc 撤销刚划的高亮。只认「刚划且没问过」的那条，绝不碰旧批注 */
-	private async undoFreshHighlight(fresh: { id: string; slot: PageSlot }): Promise<void> {
+	private async undoFreshHighlight(fresh: { id: string; slot: PageSlot; snapshot?: NonNullable<AnnotationEntry['pdf']> }): Promise<void> {
 		const file = this.file;
 		if (!file) return;
 		const { doc } = await this.plugin.repository.loadFor(file);
 		const entry = doc.entries.find((item) => item.id === fresh.id);
-		if (!entry || entry.qas.length) return;
+		if (!entry) return;
+		if (fresh.snapshot) {
+			// 这一笔是「并入已有高亮」：只把并进去的还回去，别删掉整条
+			if (entry.qas.length) return;
+			await this.plugin.repository.updateEntry(file, fresh.id, { pdf: fresh.snapshot });
+			await this.drawMarksFor(fresh.slot);
+			this.setStatus(t('已还原这次续划'));
+			return;
+		}
+		if (entry.qas.length || entry.note?.trim()) return;
 		await this.plugin.deleteEntry(fresh.id, file);
 		await this.drawMarksFor(fresh.slot);
 		this.setStatus(t('已撤销这次高亮'));

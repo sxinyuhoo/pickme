@@ -141,6 +141,15 @@ const HIGHLIGHT_PAD = 1;
 /** 行带最小横向宽度：竖划或极短笔迹也要给出一个能看见的宽度，避免零宽行带 */
 const HIGHLIGHT_MIN_WIDTH = 4;
 
+/**
+ * 「以竖向为主的一笔 = 整行」判定之一：本行上笔迹的横向跨度小于该行字高的这个比例，
+ * 才算这一行上横向几乎没动。
+ */
+const VERTICAL_STROKE_SPAN_FACTOR = 0.5;
+
+/** 判定之二：整笔纵向跨度 >= 系数 × 横向跨度 + 字高，才算「以竖向为主」，避免把斜划当竖划 */
+const VERTICAL_STROKE_RATIO = 2;
+
 /** 沿折线每 step 补一个采样点，保证相邻点之间的线段足够短 */
 function resampleStroke(points: StrokePoint[], step: number): StrokePoint[] {
 	const out: StrokePoint[] = [{ x: points[0].x, y: points[0].y }];
@@ -285,6 +294,21 @@ function strokeSpanInBand(
 	return min <= max ? [min, max] : null;
 }
 
+/** 整笔在横/纵方向上的跨度，用来识别「以竖向为主」的一笔 */
+function strokeExtent(points: StrokePoint[]): { width: number; height: number } {
+	let minX = Infinity;
+	let maxX = -Infinity;
+	let minY = Infinity;
+	let maxY = -Infinity;
+	for (const point of points) {
+		if (point.x < minX) minX = point.x;
+		if (point.x > maxX) maxX = point.x;
+		if (point.y < minY) minY = point.y;
+		if (point.y > maxY) maxY = point.y;
+	}
+	return { width: maxX - minX, height: maxY - minY };
+}
+
 /**
  * 一笔笔迹 → 吸附后的行框，按阅读顺序（先上后下、再左到右）。
  * items 是整页的文字项，points 是笔迹采样点，两者都在 PDF 用户空间。
@@ -297,6 +321,9 @@ export function strokeToLines(items: TextItemBox[], points: StrokePoint[]): Line
 	if (stroke.length < 2) return [];
 	const hit = items.filter((item) => item.str.trim() !== '' && strokeHitsItem(item, stroke));
 	if (hit.length === 0) return [];
+
+	// 整笔的横/纵跨度：用于「竖向为主的一笔 = 整行」的判定
+	const extent = strokeExtent(sampled);
 
 	const lines: LineBox[] = [];
 	for (const group of groupByBaseline(hit)) {
@@ -319,6 +346,16 @@ export function strokeToLines(items: TextItemBox[], points: StrokePoint[]): Line
 			if (span) {
 				x0 = Math.max(itemLeft, span[0] - HIGHLIGHT_PAD);
 				x1 = Math.min(itemRight, span[1] + HIGHLIGHT_PAD);
+			}
+			// 竖向为主的笔画（纵向跨多行、横向几乎不动）：这一行改用命中项的完整范围，
+			// 而不是笔迹跨度 —— 竖着往下拖就等于「整行整行地划」，不再只留一个几 pt 宽的细条。
+			const spanWidth = span ? span[1] - span[0] : 0;
+			if (
+				spanWidth < height * VERTICAL_STROKE_SPAN_FACTOR &&
+				extent.height >= extent.width * VERTICAL_STROKE_RATIO + height
+			) {
+				x0 = itemLeft;
+				x1 = itemRight;
 			}
 			// 竖划或极短笔迹会算出零宽，撑到最小宽度后再夹回命中项范围
 			if (x1 - x0 < HIGHLIGHT_MIN_WIDTH) {
