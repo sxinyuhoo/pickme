@@ -217,6 +217,30 @@ test('多行命中文本往返后完整保留（修复只留第一行的缺陷�
 	assert.equal(parseAnnotationDoc(longText, longDoc.selfPath).entries[0].pdf?.hitText, long);
 });
 
+test('多行选区落盘转义成单行 bullet，往返后完整保留（修复只留第一行的缺陷）', () => {
+	const doc = sampleDoc();
+	doc.entries = [doc.entries[0]];
+	doc.entries[0].selection = '第一行选区\n第二行选区\n第三行选区';
+
+	const text = renderAnnotationDoc(doc);
+	const line = text.split('\n').find((l) => l.startsWith('- 选区：')) ?? '';
+	// 换行必须写成字面 \n 落成单个 bullet，否则逐行解析只回得来第一行
+	assert.equal(line, '- 选区：第一行选区\\n第二行选区\\n第三行选区');
+
+	const parsed = parseAnnotationDoc(text, doc.selfPath);
+	assert.equal(parsed.entries[0].selection, '第一行选区\n第二行选区\n第三行选区');
+});
+
+test('选区里的反斜杠与 CRLF 也能往返', () => {
+	const doc = sampleDoc();
+	doc.entries = [doc.entries[0]];
+	doc.entries[0].selection = '用 \\n 转义\r\n第二行\\反斜杠';
+
+	const parsed = parseAnnotationDoc(renderAnnotationDoc(doc), doc.selfPath);
+	// CRLF 归一成 \n，字面 \n 与孤立反斜杠原样保留
+	assert.equal(parsed.entries[0].selection, '用 \\n 转义\n第二行\\反斜杠');
+});
+
 test('老格式文本解析后 shapes 为 undefined，shapesOf 退化成单个框', () => {
 	const old = [
 		'## 锚点 old001',

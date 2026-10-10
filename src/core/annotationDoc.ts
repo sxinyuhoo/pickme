@@ -68,13 +68,23 @@ function noteSummary(text: string): string {
 	return oneLine.length > NOTE_LIMIT ? oneLine.slice(0, NOTE_LIMIT) : oneLine;
 }
 
+/** 选区的单行 bullet 转义：反斜杠翻倍、换行统一写成字面 \n，跨行选区落盘后仍能解析回多行 */
+function escapeInline(text: string): string {
+	return text.replace(/\\/g, '\\\\').replace(/\r\n|\r|\n/g, '\\n');
+}
+
+/** escapeInline 的逆操作；不带转义的老选区原样通过 */
+function unescapeInline(text: string): string {
+	return text.replace(/\\[\\n]/g, (m) => (m[1] === 'n' ? '\n' : '\\'));
+}
+
 /** 单条批注渲染为 Markdown 片段 */
 export function renderEntry(entry: AnnotationEntry): string {
 	const lines: string[] = [`${ENTRY_HEAD}${entry.id}`, ''];
 	const kind = entry.kind === 'pdf' ? 'PDF 区域' : '文本';
 	lines.push(`- 类型：${kind}`);
 	if (entry.kind === 'text') {
-		lines.push(`- 选区：${entry.selection}`);
+		lines.push(`- 选区：${escapeInline(entry.selection)}`);
 	}
 	// 高亮备注：只在非空时落成单个 bullet，空备注不写，老文件逐字节不变
 	if (entry.note) lines.push(`- 备注：${noteSummary(entry.note)}`);
@@ -211,7 +221,7 @@ export function parseAnnotationDoc(text: string, selfPath: string): AnnotationDo
 		const entry: AnnotationEntry = {
 			id,
 			kind,
-			selection: values.get('选区') ?? '',
+			selection: unescapeInline(values.get('选区') ?? ''),
 			fingerprint: values.get('定位指纹') ?? '',
 			status: values.get('状态') === STATUS_STALE ? 'stale' : 'ok',
 			created: values.get('创建') ?? '',
