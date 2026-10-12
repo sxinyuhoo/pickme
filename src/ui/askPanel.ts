@@ -49,11 +49,18 @@ export interface AskPanelOptions {
 	onClose?: () => void;
 }
 
-/** 这条批注是不是「纯荧光笔高亮」：全是 line 形状，没有框 */
-function isHighlightEntry(entry: AnnotationEntry | null): boolean {
+/** 点开写备注的那两类：纯荧光笔高亮（全是 line），或纯便利贴（全是 note） */
+function isNoteBoxEntry(entry: AnnotationEntry | null): boolean {
 	if (!entry || entry.kind !== 'pdf' || !entry.pdf) return false;
 	const shapes = shapesOf(entry.pdf);
-	return shapes.length > 0 && shapes.every((shape) => shape.kind === 'line');
+	return shapes.length > 0 && shapes.every((shape) => shape.kind === 'line' || shape.kind === 'note');
+}
+
+/** 便利贴：全页只有一个 note 形状没有色带 —— 文案上要说「便利贴」而不是「高亮」 */
+function isStickyEntry(entry: AnnotationEntry | null): boolean {
+	if (!entry || entry.kind !== 'pdf' || !entry.pdf) return false;
+	const shapes = shapesOf(entry.pdf);
+	return shapes.length > 0 && shapes.every((shape) => shape.kind === 'note');
 }
 
 const PANEL_WIDTH = 380;
@@ -317,7 +324,7 @@ export class AskPanel implements AskSink {
 			root.createDiv({ cls: 'pickme-selection', text: shorten(selection, 160) });
 		}
 
-		if (this.mode === 'note' || (this.mode === null && isHighlightEntry(entry))) {
+		if (this.mode === 'note' || (this.mode === null && isNoteBoxEntry(entry))) {
 			this.renderNoteBox(root, entry);
 			// 以前问过 AI 的高亮仍然把问答显示出来，别把已有内容藏起来
 			if (entry.qas.length) this.renderHistory(root, entry);
@@ -338,7 +345,7 @@ export class AskPanel implements AskSink {
 		const input = box.createEl('textarea', { cls: 'pickme-note-input' });
 		this.noteInput = input;
 		input.rows = 3;
-		input.placeholder = t('写点批注…（⌘/Ctrl + Enter 保存）');
+		input.placeholder = isStickyEntry(entry) ? t('写点什么…（⌘/Ctrl + Enter 保存）') : t('写点批注…（⌘/Ctrl + Enter 保存）');
 		input.value = entry.note ?? '';
 
 		// 状态行要自己建：setStatus 写的是 this.statusEl，而问答表单里那个在批注形态下不存在
@@ -349,8 +356,12 @@ export class AskPanel implements AskSink {
 		const save = row.createEl('button', { cls: 'mod-cta', text: t('保存批注') });
 		const ask = row.createEl('button', { text: t('改问 AI') });
 		ask.setAttribute('aria-label', t('把这条高亮交给 AI 提问'));
-		const remove = row.createEl('button', { cls: 'pickme-note-remove', text: t('删除这条高亮') });
-		remove.setAttribute('aria-label', t('连同这条高亮一起删掉'));
+		const sticky = isStickyEntry(entry);
+		const remove = row.createEl('button', {
+			cls: 'pickme-note-remove',
+			text: sticky ? t('删除这张便利贴') : t('删除这条高亮'),
+		});
+		remove.setAttribute('aria-label', sticky ? t('连同便利贴一起删掉') : t('连同这条高亮一起删掉'));
 
 		const saveNote = async () => {
 			const text = input.value.trim();
@@ -361,6 +372,13 @@ export class AskPanel implements AskSink {
 			this.setStatus(text ? t('批注已保存') : t('批注已清空'));
 		};
 		input.addEventListener('keydown', (event) => {
+			// 面板的 Esc 监听挂在问答输入框上，批注框里没有那个元素，得自己接一个：
+			// 否则「放下便利贴 → 不想写 → Esc」既关不掉面板，空便利贴也收不回去
+			if (event.key === 'Escape') {
+				event.preventDefault();
+				this.close();
+				return;
+			}
 			if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
 				event.preventDefault();
 				void saveNote();
@@ -372,7 +390,7 @@ export class AskPanel implements AskSink {
 			this.render();
 		};
 		remove.onclick = () => {
-			new ConfirmModal(this.plugin.app, t('连同高亮删掉这条批注？'), () => {
+			new ConfirmModal(this.plugin.app, sticky ? t('删掉这张便利贴？') : t('连同高亮删掉这条批注？'), () => {
 				void this.plugin.deleteEntry(this.entryId, this.file).then(() => this.close('handover'));
 			}).open();
 		};

@@ -48,7 +48,7 @@ export interface PickmeSettings {
 	pdfTocOpen: boolean;
 	/** PDF 页面上是否画出已有批注的高亮框（关掉就是原始 PDF 的样子） */
 	showMarks: boolean;
-	/** PDF 标注方式：荧光笔（拖一笔吸附到文字行）还是框选 */
+	/** PDF 标注方式：荧光笔（拖一笔吸附到文字行）/ 框选（拖一块区域）/ 便利贴（点一下放图标） */
 	pdfAnnotateMode: PdfAnnotateMode;
 	/** 框选时保存区域截图 */
 	pdfSaveScreenshot: boolean;

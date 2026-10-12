@@ -559,6 +559,36 @@ body.pickme-mark-border .pickme-mark {
 	color: var(--text-error);
 }
 
+/* 便利贴：页面上只留一个小图标，内容点开才看（有内容是实心，空的是虚线） */
+.pickme-pdf-sticky {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	max-width: 22px;
+	max-height: 22px;
+	border-radius: 3px 3px 3px 8px;
+	background: var(--color-yellow, #ffd54a);
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-normal) 25%, transparent), 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.pickme-pdf-sticky.is-empty {
+	background: color-mix(in srgb, var(--color-yellow, #ffd54a) 45%, transparent);
+	border: 1px dashed color-mix(in srgb, var(--text-normal) 40%, transparent);
+}
+
+/* 外接矩形自己不收指针事件（见 .pickme-pdf-mark），子形状必须自己声明，否则点图标会穿透到页面、
+   变成「在原地又放一个新便利贴」而不是「打开这一张」 */
+.pickme-pdf-sticky {
+	pointer-events: auto;
+	cursor: pointer;
+}
+
+/* 便利贴模式：指针换成便利贴图标（热区在左上角） */
+.pickme-pdf-sheet.is-mode-note .pickme-pdf-overlay {
+	cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><rect x='4' y='4' width='16' height='16' rx='2' fill='%23ffd54a' stroke='%23222' stroke-width='1.1'/><path d='M15 20v-5h5z' fill='%23c8a02a'/></svg>") 6 6, copy;
+}
+
 .pickme-pdf-canvas {
 	display: block;
 }
@@ -636,6 +666,10 @@ body.pickme-mark-border .pickme-mark {
 /* 正在读的那条完整显形，同页其它批注退到背景 */
 .pickme-pdf-mark.is-active .pickme-pdf-band {
 	background: color-mix(in srgb, var(--pickme-highlight) 52%, transparent);
+}
+
+.pickme-pdf-mark.is-active .pickme-pdf-sticky {
+	transform: scale(1.15);
 }
 
 .pickme-pdf-mark.is-active .pickme-pdf-box {

@@ -244,7 +244,16 @@ export const EN: Record<string, string> = {
 	'默认标注方式': 'Default annotation mode',
 	'荧光笔：拖一笔划过文字就自动吸附到行；框选：拖出一块区域。随时可在 PDF 工具栏切换。':
 		'Highlighter: drag across text and it snaps to the text lines. Region: drag out an area. Switch anytime from the PDF toolbar.',
-	'拖一笔划过文字即可批注；左右滑动翻页': 'Drag across text to annotate; swipe sideways to flip pages',
+	'拖一笔划过文字即可高亮；左右滑动翻页': 'Drag across text to highlight; swipe sideways to flip pages',
+	'点一下页面任意位置放便利贴；左右滑动翻页': 'Click anywhere to drop a sticky note; swipe sideways to flip pages',
+	'便利贴批注': 'Sticky note',
+	'便利贴': 'Sticky note',
+	'空便利贴': 'Empty sticky note',
+	'删除这张便利贴': 'Delete this sticky note',
+	'连同便利贴一起删掉': 'Delete this sticky note as well',
+	'删掉这张便利贴？': 'Delete this sticky note?',
+	'写点什么…（⌘/Ctrl + Enter 保存）': 'Write something… (⌘/Ctrl + Enter to save)',
+
 	'这里没有可取的文字，切到框选可框选区域': 'No selectable text here — switch to region mode to select an area',
 	'第 {v0} 页 · {v1}': 'Page {v0} · {v1}',
 	'首次提问': 'First question',

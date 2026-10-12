@@ -411,7 +411,7 @@ test('带备注的高亮：备注落成单行 bullet，往返后回到 entry.not
 	assert.equal(parsed.entries[0].note, '这段是强制条文，施工图必须复核');
 });
 
-test('备注里的换行折成空格、超长截断，落盘仍是单行', () => {
+test('备注里的换行折成空格、超长截断，bullet 仍是单行', () => {
 	const doc = sampleDoc();
 	doc.entries = [pdfEntry({})];
 	doc.entries[0].note = `第一行\n第二行	第三行${'甲'.repeat(200)}`;
@@ -422,8 +422,9 @@ test('备注里的换行折成空格、超长截断，落盘仍是单行', () =>
 	assert.ok(!noteLine.includes('	'), '制表符应当折成空格');
 	assert.equal(noteLine.length, '- 备注：'.length + 120, '备注截断到 120 字');
 	assert.equal(noteLine.slice(0, '- 备注：'.length + 11), '- 备注：第一行 第二行 第三行');
-	// 解析回来就是这条单行摘要
-	assert.equal(parseAnnotationDoc(text, doc.selfPath).entries[0].note, noteLine.slice('- 备注：'.length));
+	// 含换行的备注另起「### 批注」小节，解析优先取小节，拿回的是含换行的全文
+	assert.ok(text.includes('### 批注'), '多行备注要落成小节');
+	assert.equal(parseAnnotationDoc(text, doc.selfPath).entries[0].note, doc.entries[0].note);
 });
 
 test('没有备注时渲染结果与旧格式逐字节一致', () => {
@@ -451,4 +452,93 @@ test('解析：读到「- 备注：」写回 note，没有该 bullet 时 note �
 		'',
 	].join('\n');
 	assert.equal(parseAnnotationDoc(withoutNote, 'x.md').entries[0].note, undefined);
+});
+
+/* ---------- 便利贴（note 形状） ---------- */
+
+test('便利贴形状：形状标签出「便利贴」，便利贴/归一化便利贴往返且归一化留 4 位', () => {
+	const doc = sampleDoc();
+	const shapes: PdfShape[] = [
+		{ kind: 'note', rect: [280, 300, 298, 318], norm: [0.4706, 0.3563, 0.5008, 0.3777] },
+	];
+	doc.entries = [pdfEntry({ shapes })];
+
+	const text = renderAnnotationDoc(doc);
+	assert.ok(text.includes('- 形状：便利贴'), '形状标签走 shapeKindLabel，出「便利贴」');
+	assert.ok(text.includes('- 便利贴：280,300,298,318'), '便利贴写用户空间矩形（取整）');
+	assert.ok(text.includes('- 归一化便利贴：0.4706,0.3563,0.5008,0.3777'), '归一化留 4 位小数');
+	assert.ok(!text.includes('- 荧光行：'), '便利贴不该落成荧光行');
+	assert.ok(!text.includes('- 框：'), '便利贴不该落成框');
+
+	const parsed = parseAnnotationDoc(text, doc.selfPath);
+	const pdf = parsed.entries[0].pdf;
+	assert.ok(pdf);
+	assert.deepEqual(pdf.shapes?.map((s) => s.kind), ['note']);
+	assert.deepEqual(pdf.shapes?.[0].norm, [0.4706, 0.3563, 0.5008, 0.3777]);
+	// 解析时归一化优先，rect 由 norm 乘页面尺寸还原
+	assert.equal(Math.round(pdf.shapes?.[0].rect[0] ?? 0), 280);
+	assert.equal(Math.round(pdf.shapes?.[0].rect[3] ?? 0), 318);
+	assert.deepEqual(shapesOf(pdf), pdf.shapes);
+});
+
+test('便利贴形状缺失归一化字段时，用「便利贴」按页面尺寸换算出来', () => {
+	const text = [
+		'## 锚点 note01',
+		'',
+		'- 类型：PDF 区域',
+		'- 形状：便利贴',
+		'- 页面尺寸：1000x1000',
+		'- 矩形：280,300,298,318',
+		'- 归一化矩形：0.28,0.3,0.298,0.318',
+		'- 便利贴：280,300,298,318',
+		'- 归一化便利贴：garbage',
+		'',
+	].join('\n');
+	const shapes = parseAnnotationDoc(text, 'x.md').entries[0].pdf?.shapes ?? [];
+	assert.equal(shapes.length, 1);
+	assert.equal(shapes[0].kind, 'note');
+	assert.deepEqual(shapes[0].norm, [0.28, 0.3, 0.298, 0.318]);
+});
+
+/* ---------- 多行备注（### 批注 小节） ---------- */
+
+test('多行备注：另起「### 批注」小节，往返后全文与换行都不丢', () => {
+	const doc = sampleDoc();
+	doc.entries = [pdfEntry({ hitText: '最大纵坡不应大于' })];
+	const note = '第一行结论\n第二行补充说明\n第三行：隧道段另有要求';
+	doc.entries[0].note = note;
+
+	const text = renderAnnotationDoc(doc);
+	assert.ok(text.includes('### 批注'), '多行备注要落成小节');
+	// 单行 bullet 仍在，且只放折叠后的摘要
+	const noteLine = text.split('\n').find((line) => line.startsWith('- 备注：')) ?? '';
+	assert.ok(noteLine.includes('第一行结论 第二行补充说明'), 'bullet 是折叠后的单行摘要');
+	assert.ok(!noteLine.includes('\n'), 'bullet 本身是单行');
+
+	const parsed = parseAnnotationDoc(text, doc.selfPath);
+	assert.equal(parsed.entries[0].note, note, '全文一字不差');
+	assert.equal(parsed.entries[0].note?.split('\n').length, 3, '换行都留着');
+
+	// 小节优先于 bullet：把 bullet 改写掉，解析仍以小节为准
+	const tampered = text.replace(/- 备注：[^\n]*/, '- 备注：被改掉的摘要');
+	assert.equal(parseAnnotationDoc(tampered, doc.selfPath).entries[0].note, note);
+	// 没有小节时（删掉整段）才回退到 bullet
+	const bulletOnly = text.replace(/\n### 批注\n\n[\s\S]*$/, '\n');
+	assert.equal(parseAnnotationDoc(bulletOnly, doc.selfPath).entries[0].note, noteLine.slice('- 备注：'.length));
+});
+
+test('单行备注不写「### 批注」小节，落盘等于老格式加一行 bullet（逐字节）', () => {
+	const doc = sampleDoc();
+	doc.entries = [pdfEntry({ hitText: '最大纵坡不应大于' })];
+	doc.entries[0].note = '这段是强制条文，施工图必须复核';
+	const text = renderAnnotationDoc(doc);
+	assert.ok(!text.includes('### 批注'), '单行备注不该起「### 批注」小节');
+
+	const bare = sampleDoc();
+	bare.entries = [pdfEntry({ hitText: '最大纵坡不应大于' })];
+	const expected = renderAnnotationDoc(bare).replace(
+		'- 类型：PDF 区域\n',
+		'- 类型：PDF 区域\n- 备注：这段是强制条文，施工图必须复核\n',
+	);
+	assert.equal(text, expected, '仅比无备注版本多一行 bullet，其它逐字节一致');
 });

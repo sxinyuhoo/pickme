@@ -13,11 +13,11 @@ export interface QA {
 	created: string;
 }
 
-/** PDF 标注方式：荧光笔（拖一笔吸附到文字行）还是框选 */
-export type PdfAnnotateMode = 'highlight' | 'area';
+/** PDF 标注方式：荧光笔（拖一笔吸附到文字行）、框选，还是点一下落便利贴 */
+export type PdfAnnotateMode = 'highlight' | 'area' | 'note';
 
-/** 一条 PDF 批注里的单个形状 */
-export type PdfShapeKind = 'area' | 'line';
+/** 一条 PDF 批注里的单个形状：框选 = area，荧光笔 = line，便利贴 = note */
+export type PdfShapeKind = 'area' | 'line' | 'note';
 
 export interface PdfShape {
 	kind: PdfShapeKind;
@@ -60,6 +60,8 @@ export function shapesOf(pdf: PdfAnchorInfo): PdfShape[] {
 /** 形状组合的短称，返回中文原文（调用处再交给 t() 翻译） */
 export function shapeKindLabel(pdf: PdfAnchorInfo): string {
 	const shapes = shapesOf(pdf);
+	// 便利贴是单形状批注，标签直接给「便利贴」
+	if (shapes.some((shape) => shape.kind === 'note')) return '便利贴';
 	const hasLine = shapes.some((shape) => shape.kind === 'line');
 	const hasArea = shapes.some((shape) => shape.kind === 'area');
 	if (hasLine && hasArea) return '框+线';

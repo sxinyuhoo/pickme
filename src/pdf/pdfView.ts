@@ -14,6 +14,8 @@ import { fingerprint, newAnchorId } from '../core/anchor.ts';
 import { nowIso } from '../util.ts';
 import { shapeKindLabel, shapesOf } from '../core/types.ts';
 import { mergeBandRects, mergeHitText, pickMergeTarget } from '../core/pdfmerge.ts';
+import { noteRectAt } from '../core/sticky.ts';
+import type { PdfAnnotateMode } from '../core/types.ts';
 import type { MergeTarget } from '../core/pdfmerge.ts';
 import type { AnnotationEntry, PdfAnchorInfo, PdfShape } from '../core/types.ts';
 import { askPanelOf, openAskPanel as mountAskPanel } from '../ui/askPanel.ts';
@@ -129,6 +131,7 @@ export class PickmePdfView extends FileView {
 	/** 标注方式按钮：荧光笔 / 框选，互斥 */
 	private highlighterButton: HTMLButtonElement | null = null;
 	private areaButton: HTMLButtonElement | null = null;
+	private stickyButton: HTMLButtonElement | null = null;
 	/** 目录面板与它的开关按钮（PDF 没目录时按钮不显示） */
 	private tocEl: HTMLElement | null = null;
 	private tocButton: HTMLButtonElement | null = null;
@@ -404,6 +407,7 @@ export class PickmePdfView extends FileView {
 		// 标注方式：荧光笔（拖一笔吸附到文字行）｜框选（拖出一块区域）
 		this.highlighterButton = this.iconButton(toolbar, 'highlighter', tKey('荧光笔批注'), () => this.setAnnotateMode('highlight'), 'pickme-pdf-mode');
 		this.areaButton = this.iconButton(toolbar, 'box-select', tKey('框选批注'), () => this.setAnnotateMode('area'), 'pickme-pdf-mode');
+		this.stickyButton = this.iconButton(toolbar, 'sticky-note', tKey('便利贴批注'), () => this.setAnnotateMode('note'), 'pickme-pdf-mode');
 		this.addToolbarSep(toolbar);
 
 		// 显示：高亮总开关（关掉就是原样的 PDF，只看内容时不被标记打扰）
@@ -543,9 +547,10 @@ export class PickmePdfView extends FileView {
 
 	/** 状态文案随标注方式变，切换方式时也用它提示操作 */
 	private readyStatusText(): string {
-		return this.plugin.settings.pdfAnnotateMode === 'highlight'
-			? t('拖一笔划过文字即可批注；左右滑动翻页')
-			: t('拖动框选提问；左右滑动翻页');
+		const mode = this.plugin.settings.pdfAnnotateMode;
+		if (mode === 'highlight') return t('拖一笔划过文字即可高亮；左右滑动翻页');
+		if (mode === 'note') return t('点一下页面任意位置放便利贴；左右滑动翻页');
+		return t('拖动框选提问；左右滑动翻页');
 	}
 
 	// ---------- 文档 ----------
@@ -598,6 +603,7 @@ export class PickmePdfView extends FileView {
 			sheet.setAttribute('data-page', String(index));
 			// 指针样式随标注方式走（笔刷 / 十字），具体在 styles.css 里按这个类切
 			sheet.toggleClass('is-mode-highlight', this.plugin.settings.pdfAnnotateMode === 'highlight');
+			sheet.toggleClass('is-mode-note', this.plugin.settings.pdfAnnotateMode === 'note');
 			const canvas = sheet.createEl('canvas', { cls: 'pickme-pdf-canvas' });
 			const overlay = sheet.createDiv({ cls: 'pickme-pdf-overlay' });
 			const marquee = overlay.createDiv({ cls: 'pickme-pdf-marquee' });
@@ -984,10 +990,18 @@ export class PickmePdfView extends FileView {
 			});
 			if (entry.status === 'stale') mark.addClass('is-stale');
 			if (entry.id === this.panelEntryId) mark.addClass('is-active');
-			mark.setAttribute('title', entry.qas[0]?.question ?? entry.id);
+			// 便利贴的悬停提示就是它自己写的内容
+			const isSticky = shapesOf(pdf).every((shape) => shape.kind === 'note');
+			mark.setAttribute('title', isSticky ? (entry.note?.trim() || t('空便利贴')) : entry.qas[0]?.question ?? entry.id);
 
 			for (const shape of shapesOf(pdf)) {
 				const screen = pdfToScreenRect(shape.rect, size, pdf.pageSize, rotation);
+				if (shape.kind === 'note') {
+					// 便利贴：页面上只留一个小图标，内容点开才看
+					const icon = mark.createDiv({ cls: 'pickme-pdf-sticky' });
+					if (!entry.note?.trim()) icon.addClass('is-empty');
+					continue;
+				}
 				// 子形状相对外接矩形定位：外接矩形自己不收指针事件，空白处点不开批注
 				const box = mark.createDiv({ cls: shape.kind === 'line' ? 'pickme-pdf-band' : 'pickme-pdf-box' });
 				box.setCssProps({
@@ -1023,10 +1037,13 @@ export class PickmePdfView extends FileView {
 			this.strokePoints = [point];
 			slot.preview.empty();
 			slot.preview.hide();
-		} else {
+		} else if (this.plugin.settings.pdfAnnotateMode === 'area') {
 			this.strokePoints = [];
 			slot.marquee.show();
 			this.updateMarquee(slot, point, point);
+		} else {
+			// 便利贴：点哪儿放哪儿，没有拖动预览
+			this.strokePoints = [];
 		}
 		// 合成事件或异常指针 id 时捕获会抛错，捕获失败不影响框选
 		try {
@@ -1065,6 +1082,10 @@ export class PickmePdfView extends FileView {
 		}
 		if (!start) return;
 		const end = this.relativePoint(slot, event);
+		if (this.plugin.settings.pdfAnnotateMode === 'note') {
+			await this.createStickyAnnotation(slot, end);
+			return;
+		}
 		if (this.plugin.settings.pdfAnnotateMode === 'highlight') {
 			this.strokePoints.push(end);
 			// 合并续划要看起笔落在哪（清空之前先取出来）
@@ -1158,10 +1179,53 @@ export class PickmePdfView extends FileView {
 		}
 	}
 
+	// ---------- 便利贴 ----------
+
+	/**
+	 * 便利贴：在页面任意位置放一个小图标，点开才看/写内容。
+	 * 内容就是 entry.note（多行也存得下），和高亮的备注是同一个字段。
+	 */
+	private async createStickyAnnotation(slot: PageSlot, screenPoint: Point): Promise<void> {
+		const file = this.file;
+		if (!file) return;
+		const viewSize = this.viewSizeOf(slot);
+		const rotation = this.rotationOf(slot);
+		const point = this.toPdfPoint(slot, screenPoint);
+		const rect = noteRectAt(point, viewSize);
+		const norm = toNormalized(rect, viewSize);
+		const id = newAnchorId();
+		const entry: AnnotationEntry = {
+			id,
+			kind: 'pdf',
+			selection: '',
+			fingerprint: fingerprint(`p${slot.index}:note:${Math.round(point.x)},${Math.round(point.y)}`),
+			status: 'ok',
+			created: nowIso(),
+			qas: [],
+			pdf: {
+				page: slot.index,
+				pageSize: viewSize,
+				rect,
+				normRect: norm,
+				shapes: [{ kind: 'note', rect, norm }],
+				// 不旋转的页面不写这个字段，保持与既有文件一致
+				...(rotation ? { rotation } : {}),
+				hitText: '',
+				// 便利贴是位置标记，没有文字可截图
+				image: '',
+			},
+		};
+		await this.plugin.repository.addEntry(file, entry);
+		await this.drawMarksFor(slot);
+		// 刚放下的便利贴：直接把批注框打开让人写，没写就 Esc 收回（不弹 AI 问答）
+		const screenRect = pdfToScreenRect(rect, this.slotSize(slot), viewSize, rotation);
+		this.openAskPanel(id, slot, screenRect, true, 'note');
+	}
+
 	// ---------- 荧光笔 ----------
 
 	/** 切换标注方式：荧光笔（拖一笔吸附到文字行）/ 框选（拖出一块区域） */
-	private setAnnotateMode(mode: 'highlight' | 'area'): void {
+	private setAnnotateMode(mode: PdfAnnotateMode): void {
 		this.plugin.settings.pdfAnnotateMode = mode;
 		void this.plugin.saveSettings();
 		this.refreshModeButtons();
@@ -1173,10 +1237,15 @@ export class PickmePdfView extends FileView {
 		const mode = this.plugin.settings.pdfAnnotateMode;
 		this.highlighterButton?.toggleClass('is-active', mode === 'highlight');
 		this.areaButton?.toggleClass('is-active', mode === 'area');
+		this.stickyButton?.toggleClass('is-active', mode === 'note');
 		this.highlighterButton?.setAttribute('aria-pressed', String(mode === 'highlight'));
 		this.areaButton?.setAttribute('aria-pressed', String(mode === 'area'));
-		// 页面上跟着换指针：荧光笔是笔刷，框选是十字
-		for (const slot of this.slots) slot.sheet.toggleClass('is-mode-highlight', mode === 'highlight');
+		this.stickyButton?.setAttribute('aria-pressed', String(mode === 'note'));
+		// 页面上跟着换指针：荧光笔是笔刷，框选是十字，便利贴是便利贴图标
+		for (const slot of this.slots) {
+			slot.sheet.toggleClass('is-mode-highlight', mode === 'highlight');
+			slot.sheet.toggleClass('is-mode-note', mode === 'note');
+		}
 	}
 
 	/** 正在读的那条批注完整显形，同页其它批注退到背景（样式见 styles.css 的 is-active） */
@@ -1192,6 +1261,7 @@ export class PickmePdfView extends FileView {
 	private shapeWord(pdf: PdfAnchorInfo): string {
 		const kind = shapeKindLabel(pdf);
 		if (kind === '框+线') return t('框+线');
+		if (kind === '便利贴') return t('便利贴');
 		return kind === '荧光' ? t('荧光') : t('框选');
 	}
 

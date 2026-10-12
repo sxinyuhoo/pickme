@@ -2,6 +2,13 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.0.11
+
+### Added
+
+- **Sticky notes.** A third annotation mode alongside the highlighter and the region tool: click anywhere on a PDF page and a small sticky-note icon is dropped there — the icon is all you see on the page, and clicking it opens what you wrote (hovering previews it). Notes can run several lines: the text is kept in full in the annotation file (`### 注释`) with a one-line summary in the bullets, so a long note survives a round trip through the file. The icon is filled when it has content and dashed while it is empty, and the box offers “Ask AI instead” exactly like a highlight's note.
+- Note text is no longer folded to a single line: a note that contains line breaks is written out in full (a highlight's note benefits too).
+
 ## 1.0.10
 
 ### Added

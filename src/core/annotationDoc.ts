@@ -1,5 +1,5 @@
 import type { AnnotationDoc, AnnotationEntry, PdfAnchorInfo, PdfShape, QA } from './types.ts';
-import { shapesOf } from './types.ts';
+import { shapeKindLabel, shapesOf } from './types.ts';
 import type { Rect } from './pdfgeom.ts';
 import { parseFrontmatter, stringifyFrontmatter } from './frontmatter.ts';
 
@@ -8,6 +8,8 @@ const STATUS_OK = '有效';
 const STATUS_STALE = '失效';
 /** 完整命中文本所在的小节名；多行文字必须落在这里，单行 bullet 存不住换行 */
 const HIT_TEXT_SECTION = '命中文本';
+/** 多行备注全文所在的小节名；同样因为单行 bullet 存不住换行 */
+const NOTE_SECTION = '批注';
 /** 单行命中文本摘要的截断长度 */
 const HIT_TEXT_LIMIT = 120;
 /** 高亮备注的单行 bullet 截断长度 */
@@ -17,9 +19,11 @@ function entryStatusLabel(entry: AnnotationEntry): string {
 	return entry.status === 'ok' ? STATUS_OK : STATUS_STALE;
 }
 
-/** 形状集合 →「形状」字段取值：框 / 线 / 框+线。老批注走 shapesOf，只有一个 area 时为纯框选 */
+/** 形状集合 →「形状」字段取值：框 / 线 / 框+线 / 便利贴。老批注走 shapesOf，只有一个 area 时为纯框选 */
 function shapeLabel(pdf: PdfAnchorInfo): string {
 	const kinds = new Set(shapesOf(pdf).map((s) => s.kind));
+	// 便利贴是单形状批注，标签直接走 shapeKindLabel（出「便利贴」）
+	if (kinds.has('note')) return shapeKindLabel(pdf);
 	const parts: string[] = [];
 	if (kinds.has('area')) parts.push('框');
 	if (kinds.has('line')) parts.push('线');
@@ -89,6 +93,7 @@ export function renderEntry(entry: AnnotationEntry): string {
 		const shapes = shapesOf(pdf);
 		const lineShapes = shapes.filter((s) => s.kind === 'line');
 		const areaShapes = shapes.filter((s) => s.kind === 'area');
+		const noteShapes = shapes.filter((s) => s.kind === 'note');
 		lines.push(`- 页码：${pdf.page}`);
 		lines.push(`- 页面尺寸：${pdf.pageSize[0]}x${pdf.pageSize[1]}`);
 		lines.push(`- 矩形：${pdf.rect.join(',')}`);
@@ -101,6 +106,11 @@ export function renderEntry(entry: AnnotationEntry): string {
 		if (areaShapes.length) {
 			lines.push(`- 框：${formatRects(areaShapes.map((s) => s.rect), 0)}`);
 			lines.push(`- 归一化框：${formatRects(areaShapes.map((s) => s.norm), 4)}`);
+		}
+		// 便利贴：一条批注只有这一个形状，格式与框/线一致，归一化同样留 4 位
+		if (noteShapes.length) {
+			lines.push(`- 便利贴：${formatRects(noteShapes.map((s) => s.rect), 0)}`);
+			lines.push(`- 归一化便利贴：${formatRects(noteShapes.map((s) => s.norm), 4)}`);
 		}
 		if (pdf.color) lines.push(`- 颜色：${pdf.color}`);
 		if (pdf.rotation) lines.push(`- 页面旋转：${pdf.rotation}`);
@@ -122,6 +132,10 @@ export function renderEntry(entry: AnnotationEntry): string {
 			lines.push(`### 追问 ${index}`, '', `问：${qa.question}`, `答：${qa.answer}`);
 		}
 	});
+	// 多行备注：单行 bullet 存不住换行，完整文本另起「### 批注」小节放在锚点末尾
+	if (entry.note && entry.note.includes('\n')) {
+		lines.push('', `### ${NOTE_SECTION}`, '', entry.note);
+	}
 	lines.push('');
 	return lines.join('\n');
 }
@@ -217,8 +231,9 @@ export function parseAnnotationDoc(text: string, selfPath: string): AnnotationDo
 			created: values.get('创建') ?? '',
 			qas: [],
 		};
-		// 高亮备注：没有这个 bullet 就保持 undefined，不凭空造字段
-		const note = (values.get('备注') ?? '').trim();
+		// 高亮备注：多行全文优先取「### 批注」小节，没有小节才回退单行 bullet；
+		// 都没有就保持 undefined，不凭空造字段
+		const note = sectionText(sections, NOTE_SECTION) || (values.get('备注') ?? '').trim();
 		if (note) entry.note = note;
 		if (kind === 'pdf') {
 			entry.pdf = parsePdfInfo(values, sections, head);
@@ -268,18 +283,22 @@ export function parseAnnotationDoc(text: string, selfPath: string): AnnotationDo
 function parseShapes(values: Map<string, string>, pageSize: [number, number]): PdfShape[] | undefined {
 	const normLines = parseRects(values.get('归一化荧光行'));
 	const normAreas = parseRects(values.get('归一化框'));
-	if (normLines.length || normAreas.length) {
+	const normNotes = parseRects(values.get('归一化便利贴'));
+	if (normLines.length || normAreas.length || normNotes.length) {
 		return [
 			...normLines.map((norm): PdfShape => ({ kind: 'line', norm, rect: rectFromNorm(norm, pageSize) })),
 			...normAreas.map((norm): PdfShape => ({ kind: 'area', norm, rect: rectFromNorm(norm, pageSize) })),
+			...normNotes.map((norm): PdfShape => ({ kind: 'note', norm, rect: rectFromNorm(norm, pageSize) })),
 		];
 	}
 	const rawLines = parseRects(values.get('荧光行'));
 	const rawAreas = parseRects(values.get('框'));
-	if (rawLines.length || rawAreas.length) {
+	const rawNotes = parseRects(values.get('便利贴'));
+	if (rawLines.length || rawAreas.length || rawNotes.length) {
 		return [
 			...rawLines.map((rect): PdfShape => ({ kind: 'line', rect, norm: normFromRect(rect, pageSize) })),
 			...rawAreas.map((rect): PdfShape => ({ kind: 'area', rect, norm: normFromRect(rect, pageSize) })),
+			...rawNotes.map((rect): PdfShape => ({ kind: 'note', rect, norm: normFromRect(rect, pageSize) })),
 		];
 	}
 	return undefined;
