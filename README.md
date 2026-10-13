@@ -1,10 +1,10 @@
 # Pick Me
 
-Annotate and ask questions about what you select — in notes and in PDFs — without leaving the page.
+Highlight, annotate and ask about what you select — in notes and in PDFs — without leaving the page.
 
 **English** | [中文](README.zh.md)
 
-Select text in a note, or drag a rectangle over a PDF page, and a panel opens right there: pick a template or ask your own question. Every annotation lives in its own Markdown file and stays linked to the source — the original document is never modified, not a single byte.
+Every annotation lives in its own Markdown file and stays linked to the source — the original document is never modified, not a single byte.
 
 ## Screenshots
 
@@ -13,7 +13,15 @@ Select text in a note, or drag a rectangle over a PDF page, and a panel opens ri
 | ![Select text in a note, the panel opens next to it](docs/screenshots/01-select-text-then-ask.png) | ![The answer appears in the panel and is saved to the annotation file](docs/screenshots/02-answer-in-panel.png) |
 | ![Drag a rectangle over a PDF page](docs/screenshots/03-pdf-region-annotate.png) | ![The annotation index, grouped by source document](docs/screenshots/04-annotation-index.png) |
 
-In a PDF you can annotate three ways, and the toolbar switches between them: drop a **sticky note** anywhere on the page (only its small icon shows; click it to read or edit the text, which can be several lines, and drag the icon to move it — in any mode), drag a **rectangle** over a region (its text and a screenshot go to the model together), or drag a **highlighter stroke** across text — the stroke snaps to the lines underneath and renders as a clean band, however shaky your hand was. The two have distinct jobs: the **highlighter just highlights** — while you drag you see your own stroke, it snaps into a clean band on release, only the stretch you actually painted is covered, and nothing pops up; click the highlight when you want to attach a one-line note (or switch that box to the question composer with “Ask AI instead”). Dragging straight down highlights whole lines, and starting the next stroke on an existing highlight (or the line next to it) merges into it, so reading down a paragraph builds one multi-line highlight. A **rectangle** never merges and opens the ask panel the moment you finish it. Which one is live is visible both on the toolbar (the active icon keeps an accent background) and in the pointer: crosshair for a region, a marker for the highlighter. The rectangle and the highlighter can be combined on the same annotation.
+In a PDF there are three annotation tools, side by side in the toolbar (the active one keeps an accent background, and the pointer changes with it):
+
+| Tool | How | What you get |
+| --- | --- | --- |
+| **Highlighter** | Drag across text | A clean band snapped to the lines — **nothing pops up**; click it to write a note. Dragging straight down highlights whole lines; starting the next stroke on an existing highlight (or the line next to it) merges into it |
+| **Region** | Drag a rectangle | The ask panel opens the moment you release; the region's text and a screenshot go to the model together |
+| **Sticky note** | Click anywhere on the page | Only a small icon stays on the page; click it to read or write (several lines are fine). The icon can be **dragged** to another spot — in any mode |
+
+The highlighter and the region tool can be combined on one annotation (a band for the text, an outline for the area). Right after a stroke or a drop, `Escape` takes that step back: a new highlight or an empty sticky note is removed entirely, while a merged stroke only gives back what it added.
 
 Drag a rectangle over a PDF page — the text of that region and its screenshot go to the model together, and the box stays on the page to reopen later:
 
@@ -51,10 +59,14 @@ Interactions happen on the page. The sidebar is only for reviewing existing anno
 ### In a PDF
 
 1. PDFs open in Pick Me's built-in pdf.js viewer by default (can be turned off in the settings).
-2. **Drag** a rectangle over the page to annotate — regions only; a single click never creates an annotation.
-3. Releasing the mouse creates the annotation and opens the panel at the same spot. The region screenshot goes to the model together with the text extracted from that region.
-4. Click an existing box on the page to reopen that annotation with its history.
-5. Close the panel with `×` or `Esc`. A box you just drew that has no question yet is **undone** when you close the panel; once you have asked something it stays.
+2. Pick a tool in the toolbar first (**Highlighter / Region / Sticky note**): the active icon keeps an accent background and the pointer changes (marker / crosshair / sticky note).
+3. **Highlighter**: swipe across text and it snaps into bands on release — a band only spans the stretch you painted; dragging straight down highlights whole lines; starting the next stroke on an existing highlight merges into it, with no panel in the way. `Escape` right after a stroke takes it back; click a highlight to write a note.
+4. **Region**: drag a rectangle and the ask panel opens right there, with the region's screenshot sent to the model as an image.
+5. **Sticky note**: click anywhere to drop a small icon (only the icon shows on the page), and a note box opens for you to write in; press `Escape` without writing and it is gone. The icon can be dragged anywhere, in any mode.
+6. Click any mark already on the page to open that annotation with its history. Highlights and sticky notes open a **note box** (write a line or a paragraph, or switch to the question composer with “Ask AI instead”); a region opens the ask panel.
+7. Close the panel with `×` or `Escape`. A region you just drew that has no question yet is **undone** when you close the panel; once you have asked something it stays.
+8. The toolbar is grouped by function, left to right, separated by hairline dividers: **outline** (only when the PDF has bookmarks) | **paging** | **zoom** | **annotation tool** (highlighter / region / sticky note, mutually exclusive) | **display** (highlight toggle). Toolbar buttons are icon-only with tooltips, and the grey text at the far right is the current status.
+9. The delete button in the panel only appears **after** you have asked something — a region with no question is removed by closing the panel. Deleting also removes its box from the page (with a confirmation).
 
 **All pages sit in one scroll container**, like the built-in PDF reader: the scrollbar represents the whole document, and the page box follows it.
 
@@ -69,7 +81,7 @@ Only pages near the viewport are rendered; far-away canvases are released and re
 
 **Outline**: PDFs with bookmarks (usually standards, manuals, datasheets) get an outline panel on the left; click an entry to jump to that page. PDFs without bookmarks get no outline button at all. The open/closed state is remembered.
 
-The toolbar is grouped by function, left to right, separated by hairline dividers: **outline** (only when the PDF has bookmarks) | **paging** (previous / page box / page count / next) | **zoom** (out / percentage / in / fit width — click the percentage to snap back to 100%) | **display** (highlight toggle: turn it off for a clean PDF). Toolbar buttons are icon-only with tooltips, and the grey text at the far right is the current status (it ellipsizes when narrow).
+
 
 ### Annotation index (one screen for the whole vault)
 
