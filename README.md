@@ -11,7 +11,8 @@ Every annotation lives in its own Markdown file and stays linked to the source �
 | Select and ask | The answer, stored with the annotation |
 | --- | --- |
 | ![Select text in a note, the panel opens next to it](docs/screenshots/01-select-text-then-ask.png) | ![The answer appears in the panel and is saved to the annotation file](docs/screenshots/02-answer-in-panel.png) |
-| ![Drag a rectangle over a PDF page](docs/screenshots/03-pdf-region-annotate.png) | ![The annotation index, grouped by source document](docs/screenshots/04-annotation-index.png) |
+| ![Three annotation types on one page: highlight bands, a region box and a sticky note](docs/screenshots/03-pdf-three-annotations.png) | ![The annotation index, grouped by source document](docs/screenshots/04-annotation-index.png) |
+| ![Clicking a sticky note opens its note box](docs/screenshots/06-pdf-sticky-note.png) | ![The built-in pdf.js viewer with its outline](docs/screenshots/05-pdf-viewer-outline.png) |
 
 In a PDF there are three annotation tools, side by side in the toolbar (the active one keeps an accent background, and the pointer changes with it):
 
@@ -23,9 +24,7 @@ In a PDF there are three annotation tools, side by side in the toolbar (the acti
 
 The highlighter and the region tool can be combined on one annotation (a band for the text, an outline for the area). Right after a stroke or a drop, `Escape` takes that step back: a new highlight or an empty sticky note is removed entirely, while a merged stroke only gives back what it added.
 
-Drag a rectangle over a PDF page — the text of that region and its screenshot go to the model together, and the box stays on the page to reopen later:
-
-![The built-in pdf.js viewer with its outline](docs/screenshots/05-pdf-viewer-outline.png)
+Drag a rectangle over a PDF page — the text of that region and its screenshot go to the model together, and the box stays on the page to reopen later (the viewer with its outline is the last screenshot below).
 
 ## Install
 

@@ -11,7 +11,8 @@
 | 选中即问 | 回答存进批注 |
 | --- | --- |
 | ![在笔记里选中一段文字，面板就地打开](docs/screenshots/01-select-text-then-ask.png) | ![回答出现在面板里，并写进批注文件](docs/screenshots/02-answer-in-panel.png) |
-| ![在 PDF 页面拖出矩形区域](docs/screenshots/03-pdf-region-annotate.png) | ![批注索引，按源文档分组](docs/screenshots/04-annotation-index.png) |
+| ![同一页上三种标注共存：高亮行带、框选区域、便利贴图标](docs/screenshots/03-pdf-three-annotations.png) | ![批注索引，按源文档分组](docs/screenshots/04-annotation-index.png) |
+| ![点开便利贴，就地写一句批注](docs/screenshots/06-pdf-sticky-note.png) | ![自带 pdf.js 阅读器与目录](docs/screenshots/05-pdf-viewer-outline.png) |
 
 PDF 里有三种标注方式，工具栏上并列切换（选中的那个图标带底色，鼠标指针也会跟着变）：
 
@@ -24,8 +25,6 @@ PDF 里有三种标注方式，工具栏上并列切换（选中的那个图标�
 荧光笔与框选可以叠加在同一条批注上（色带表达文字、描边表达区域）。刚划完或刚放下按 `Esc` 可以收回这一笔：新建的高亮、空便利贴整条收回，续划只收回这一笔。
 
 PDF 页面上画过的标记都留在原处，点它就能重新打开那条批注：
-
-![自带 pdf.js 阅读器与目录](docs/screenshots/05-pdf-viewer-outline.png)
 
 ## 安装
 
