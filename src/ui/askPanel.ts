@@ -366,9 +366,15 @@ export class AskPanel implements AskSink {
 		const saveNote = async () => {
 			const text = input.value.trim();
 			await this.plugin.saveNote(this.entryId, this.file, text);
-			// 存过就当成「认下了这条高亮」：关面板不再撤销它
+			// 存过就当成「认下了这条批注」：关面板不再撤销它
 			this.fresh = false;
 			entry.note = text || undefined;
+			// 便利贴是「贴完就走」：保存即完成，不用再去点一次关闭（框自己关掉就是反馈）
+			if (isStickyEntry(entry)) {
+				this.close();
+				return;
+			}
+			// 高亮的备注框停在原地，方便接着改或者点「改问 AI」
 			this.setStatus(text ? t('批注已保存') : t('批注已清空'));
 		};
 		input.addEventListener('keydown', (event) => {

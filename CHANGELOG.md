@@ -2,6 +2,13 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.0.13
+
+### Changed
+
+- **Saving a sticky note closes its box.** Dropping a sticky, typing and hitting save (or `⌘/Ctrl + Enter`) is the whole interaction — the box closes by itself instead of waiting for you to press the close button. The box closing is the confirmation, so no status line is left behind.
+- A highlight's note box still stays open after saving, so you can keep editing it or switch to the question composer with one click.
+
 ## 1.0.12
 
 ### Added
