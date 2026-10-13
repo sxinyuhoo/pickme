@@ -568,25 +568,32 @@ body.pickme-mark-border .pickme-mark {
 	max-width: 22px;
 	max-height: 22px;
 	border-radius: 3px 3px 3px 8px;
-	background: var(--color-yellow, #ffd54a);
-	box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-normal) 25%, transparent), 0 1px 3px rgba(0, 0, 0, 0.25);
+	/* 和主题背景混出来的浅黄：深浅主题都不过艳，还能一眼认出是便利贴 */
+	background: color-mix(in srgb, var(--color-yellow, #ffd54a) 62%, var(--background-primary));
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-normal) 18%, transparent), 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
 .pickme-pdf-sticky.is-empty {
-	background: color-mix(in srgb, var(--color-yellow, #ffd54a) 45%, transparent);
-	border: 1px dashed color-mix(in srgb, var(--text-normal) 40%, transparent);
+	background: color-mix(in srgb, var(--color-yellow, #ffd54a) 34%, var(--background-primary));
+	border: 1px dashed color-mix(in srgb, var(--text-normal) 30%, transparent);
 }
 
 /* 外接矩形自己不收指针事件（见 .pickme-pdf-mark），子形状必须自己声明，否则点图标会穿透到页面、
    变成「在原地又放一个新便利贴」而不是「打开这一张」 */
 .pickme-pdf-sticky {
 	pointer-events: auto;
-	cursor: pointer;
+	/* 能拖着换位置，所以给抓取光标而不是 pointer */
+	cursor: grab;
+}
+
+.pickme-pdf-sticky.is-dragging {
+	cursor: grabbing;
+	opacity: 0.85;
 }
 
 /* 便利贴模式：指针换成便利贴图标（热区在左上角） */
 .pickme-pdf-sheet.is-mode-note .pickme-pdf-overlay {
-	cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><rect x='4' y='4' width='16' height='16' rx='2' fill='%23ffd54a' stroke='%23222' stroke-width='1.1'/><path d='M15 20v-5h5z' fill='%23c8a02a'/></svg>") 6 6, copy;
+	cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><rect x='4' y='4' width='16' height='16' rx='2' fill='%23ffe9a8' stroke='%23222' stroke-width='1.1'/><path d='M15 20v-5h5z' fill='%23e0c477'/></svg>") 6 6, copy;
 }
 
 .pickme-pdf-canvas {

@@ -1026,6 +1026,17 @@ export class PickmePdfView extends FileView {
 		const markId = mark?.getAttribute('data-pickme-id');
 		if (markId) {
 			this.pendingMarkId = markId;
+			// 便利贴可以拖着换位置：先当「点一下看内容」，指针真动了再变成拖动
+			const holder = mark as HTMLElement | null;
+			const icon = holder?.querySelector('.pickme-pdf-sticky');
+			this.stickyDrag = icon && holder ? { id: markId, mark: holder, start: this.relativePoint(slot, event), moved: false } : null;
+			if (this.stickyDrag) {
+				try {
+					slot.overlay.setPointerCapture(event.pointerId);
+				} catch {
+					// 忽略：捕获失败不影响拖动（指针还在页面上时事件照旧）
+				}
+			}
 			return;
 		}
 		this.pendingMarkId = null;
@@ -1054,6 +1065,10 @@ export class PickmePdfView extends FileView {
 	}
 
 	private onPointerMove(slot: PageSlot, event: PointerEvent): void {
+		if (this.stickyDrag) {
+			this.dragStickyPreview(slot, event);
+			return;
+		}
 		if (!this.dragStart || this.dragSlot !== slot) return;
 		const point = this.relativePoint(slot, event);
 		if (this.plugin.settings.pdfAnnotateMode === 'highlight') {
@@ -1071,6 +1086,10 @@ export class PickmePdfView extends FileView {
 	}
 
 	private async onPointerUp(slot: PageSlot, event: PointerEvent): Promise<void> {
+		if (this.stickyDrag) {
+			await this.finishStickyDrag(slot, event);
+			return;
+		}
 		const start = this.dragSlot === slot ? this.dragStart : null;
 		const pendingMark = this.pendingMarkId;
 		this.pendingMarkId = null;
@@ -1110,6 +1129,8 @@ export class PickmePdfView extends FileView {
 	}
 
 	private resetDrag(): void {
+		this.stickyDrag?.mark.removeClass('is-dragging');
+		this.stickyDrag = null;
 		this.dragSlot?.marquee.hide();
 		this.dragSlot?.preview.hide();
 		this.dragSlot = null;
@@ -1177,6 +1198,55 @@ export class PickmePdfView extends FileView {
 			await sidebar.setFile(file);
 			sidebar.setActiveEntry(id);
 		}
+	}
+
+	/** 拖着便利贴走：超过一点点位移才算拖动，否则仍按「点一下」处理 */
+	private dragStickyPreview(slot: PageSlot, event: PointerEvent): void {
+		const drag = this.stickyDrag;
+		if (!drag) return;
+		const point = this.relativePoint(slot, event);
+		if (!drag.moved) {
+			if (Math.hypot(point.x - drag.start.x, point.y - drag.start.y) < 4) return;
+			drag.moved = true;
+			this.pendingMarkId = null; // 已经确定是拖动，松手不该再当成点击
+			drag.mark.addClass('is-dragging');
+		}
+		const rect = noteRectAt(this.toPdfPoint(slot, point), this.viewSizeOf(slot));
+		const screen = pdfToScreenRect(rect, this.slotSize(slot), this.viewSizeOf(slot), this.rotationOf(slot));
+		drag.mark.setCssProps({ left: `${screen[0]}px`, top: `${screen[1]}px` });
+	}
+
+	/** 松手：动过就写回新位置，没动就按点击打开这条批注 */
+	private async finishStickyDrag(slot: PageSlot, event: PointerEvent): Promise<void> {
+		const drag = this.stickyDrag;
+		this.stickyDrag = null;
+		const file = this.file;
+		if (!drag || !file) return;
+		drag.mark.removeClass('is-dragging');
+		if (!drag.moved) {
+			this.pendingMarkId = null;
+			this.openAskPanel(drag.id, slot);
+			return;
+		}
+		const viewSize = this.viewSizeOf(slot);
+		const point = this.toPdfPoint(slot, this.relativePoint(slot, event));
+		const rect = noteRectAt(point, viewSize);
+		const norm = toNormalized(rect, viewSize);
+		const { doc } = await this.plugin.repository.loadFor(file);
+		const entry = doc.entries.find((item) => item.id === drag.id);
+		if (!entry?.pdf) return;
+		await this.plugin.repository.updateEntry(file, drag.id, {
+			// 只挪便利贴自己的形状，将来若同一条上还叠了别的形状也不受影响
+			pdf: {
+				...entry.pdf,
+				rect,
+				normRect: norm,
+				shapes: shapesOf(entry.pdf).map((shape) => (shape.kind === 'note' ? { kind: 'note', rect, norm } : shape)),
+			},
+			fingerprint: fingerprint(`p${slot.index}:note:${Math.round(point.x)},${Math.round(point.y)}`),
+		});
+		await this.drawMarksFor(slot);
+		this.setStatus(t('便利贴已移动'));
 	}
 
 	// ---------- 便利贴 ----------
@@ -1425,6 +1495,12 @@ export class PickmePdfView extends FileView {
 
 	/** 刚划完的那条高亮：只为 Esc 撤销而记，过了时间窗或已被问过就不动它 */
 	private freshHighlight: { id: string; slot: PageSlot; at: number; snapshot?: NonNullable<AnnotationEntry['pdf']> } | null = null;
+
+	/**
+	 * 拖着走的便利贴：按下图标时先记下候选，等指针真的动了才切换成拖动。
+	 * 没动就是「点一下看内容」——同一个手势不能既是点击又是拖动。
+	 */
+	private stickyDrag: { id: string; mark: HTMLElement; start: Point; moved: boolean } | null = null;
 
 	/** Esc 撤销刚划的高亮。只认「刚划且没问过」的那条，绝不碰旧批注 */
 	private async undoFreshHighlight(fresh: { id: string; slot: PageSlot; snapshot?: NonNullable<AnnotationEntry['pdf']> }): Promise<void> {

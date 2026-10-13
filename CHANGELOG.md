@@ -2,6 +2,16 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.0.12
+
+### Added
+
+- **Sticky notes can be dragged.** Grab one and drop it wherever you want: the icon follows the pointer and the new position is written to the annotation file (the same gesture that used to be a click still opens the note — a drag only starts once the pointer actually moves). Works in every mode, so you do not have to switch back to the sticky tool to tidy up a page.
+
+### Changed
+
+- The sticky icon is a good deal paler: it is mixed from the theme's yellow and the page background, so it reads as a marker without shouting in either a light or a dark theme. Empty notes are paler still (and dashed).
+
 ## 1.0.11
 
 ### Added

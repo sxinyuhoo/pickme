@@ -252,6 +252,7 @@ export const EN: Record<string, string> = {
 	'删除这张便利贴': 'Delete this sticky note',
 	'连同便利贴一起删掉': 'Delete this sticky note as well',
 	'删掉这张便利贴？': 'Delete this sticky note?',
+	'便利贴已移动': 'Sticky note moved',
 	'写点什么…（⌘/Ctrl + Enter 保存）': 'Write something… (⌘/Ctrl + Enter to save)',
 
 	'这里没有可取的文字，切到框选可框选区域': 'No selectable text here — switch to region mode to select an area',
