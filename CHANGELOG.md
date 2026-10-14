@@ -2,6 +2,13 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.0.14
+
+### Fixed
+
+- **A multi-line selection in a note no longer loses everything after the first line.** `- 选区：` is a single-line bullet, so a selection containing newlines used to be written across several physical lines, read back as its first line only, and the annotation was afterwards reported as stale — even though the note itself was never touched. Because every read wrote the truncated value back, the rest was gone for good. The selection is now escaped into a single line (newlines become a literal `\n`, backslashes are doubled) and restored on read; files without newlines stay byte-for-byte identical, so nothing needs migrating. Reported and fixed by @tyouter (#1, #2).
+- Annotations that were already truncated cannot be repaired automatically, but the full text still sits between the anchor tags in your note — use the command **Rebind stale anchors** to attach a fresh anchor to it.
+
 ## 1.0.13
 
 ### Changed

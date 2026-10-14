@@ -119,6 +119,28 @@ Two things worth knowing:
 
 Full section-by-section explanation of every setting: [README.zh.md](README.zh.md#设置项说明) (Chinese).
 
+## Changelog
+
+One line per release; the full notes live in [CHANGELOG.md](./CHANGELOG.md).
+
+| Version | Highlights |
+| --- | --- |
+| 1.0.14 | Fixed: a multi-line selection in a note was saved as its first line only, then marked stale (community contribution) |
+| 1.0.13 | Saving a sticky note closes its box |
+| 1.0.12 | Sticky notes can be dragged anywhere; paler icon |
+| 1.0.11 | Sticky notes (a third annotation tool); notes can run several lines |
+| 1.0.10 | Continued strokes merge into one highlight; a vertical drag highlights whole lines; finishing a stroke opens nothing |
+| 1.0.9 | Highlights take a one-line note; your own stroke shows while dragging; only what you paint is covered |
+| 1.0.8 | The pointer distinguishes the three tools; the active tool is marked on the toolbar |
+| 1.0.7 | The highlighter only highlights (click it to write a note); `Escape` takes back a fresh highlight |
+| 1.0.6 | PDF highlighter annotations (strokes snap to text lines); PDFs remember where you stopped reading |
+| 1.0.5 | Fixed empty-folder cleanup that never ran |
+| 1.0.4 | No empty folder left behind when deleting an annotation; committed generated assets; gzip header fix |
+| 1.0.3 | Inlined assets packed as one gzip stream — smaller install, fewer failures |
+| 1.0.2 | The ask panel no longer preselects the first template |
+| 1.0.1 | `minAppVersion` raised to 1.7.2; panel component lifecycle fixes |
+| 1.0.0 | First release: ask about note selections and PDF regions, annotations in their own files, index and reverse navigation |
+
 ## Limitations
 
 - `main.js` is about 3.8 MB because pdf.js's CMap tables and standard fonts are inlined — the price of needing no network for PDF rendering. They ship as one gzip stream per group and are decompressed once, on demand, so the download stays as small as this feature allows.
