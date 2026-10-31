@@ -12,6 +12,8 @@ export interface PickmeSettings {
 	annotationDir: string;
 	/** 源文档被删除后，自动清理它留下的批注文件（含区域截图） */
 	pruneOrphanAnnotations: boolean;
+	/** 孤儿批注的首次发现时间（按批注文件路径记），用来要求「连续两次都判定为孤儿」才清理 */
+	orphanFirstSeen: Record<string, string>;
 	/** 模板目录 */
 	templateDir: string;
 	/** 批注索引笔记路径，留空表示不生成 */
@@ -88,6 +90,7 @@ export const DEFAULT_SETTINGS: PickmeSettings = {
 	// 不写死 .obsidian/plugins/<id>/... —— 用户改了插件目录名也不会错（官方 lint 规则 hardcoded-config-path）
 	annotationDir: '',
 	pruneOrphanAnnotations: true,
+	orphanFirstSeen: {},
 	templateDir: '',
 	tagName: DEFAULT_TAG,
 	apiBaseUrl: 'https://api.openai.com/v1',

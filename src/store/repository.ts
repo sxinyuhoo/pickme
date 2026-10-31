@@ -116,7 +116,11 @@ export class AnnotationRepository {
 	 * 只认唯一判定：存的路径找不到、且按文件名也找不到——刚移动过的文档因此不会被误删。
 	 * 批注文件连同它的区域截图一起收掉，返回被清理的源文档路径。
 	 */
-	async pruneOrphanDocs(resolveSource: (path: string) => TFile | null): Promise<string[]> {
+	async pruneOrphanDocs(
+		resolveSource: (path: string) => TFile | null,
+		seen: Record<string, string>,
+		graceMs: number,
+	): Promise<string[]> {
 		const removed: string[] = [];
 		const dir = this.dir();
 		for (const path of await this.io.listFiles(dir)) {
@@ -126,7 +130,20 @@ export class AnnotationRepository {
 			const doc = parseAnnotationDoc(text, path);
 			const sourcePath = this.sourcePathOf(path, doc);
 			if (!sourcePath) continue;
-			if (resolveSource(sourcePath)) continue;
+			if (resolveSource(sourcePath)) {
+				// 源文档回来了（或本来就在）：清掉它的孤儿记录
+				if (seen[path]) delete seen[path];
+				continue;
+			}
+			// 宽限期：第一次看到只记一笔，下次启动还判定为孤儿才清理，
+			// 挡掉「Obsidian 关着的时候改名 / iCloud 还没同步下来」这类误判
+			const firstSeen = seen[path];
+			if (!firstSeen) {
+				seen[path] = nowIso();
+				continue;
+			}
+			if (Date.now() - Date.parse(firstSeen) < graceMs) continue;
+			delete seen[path];
 			for (const entry of doc.entries) {
 				if (entry.pdf?.image) await this.io.remove(entry.pdf.image);
 			}
@@ -144,6 +161,53 @@ export class AnnotationRepository {
 	/** 某个源文档对应的批注文件路径（源文档被删除时按路径精确清理用） */
 	sidecarPathFor(sourcePath: string): string {
 		return this.sidecarPathOf(sourcePath);
+	}
+
+	/** 批注文件对应的截图目录：<批注目录>/_assets/<批注文件名>/ */
+	private assetsDirOf(sidecarPathValue: string): string {
+		const parts = sidecarPathValue.split('/');
+		return [...parts.slice(0, -1), '_assets', parts[parts.length - 1]].join('/');
+	}
+
+	/** 批注文件是否在这个仓库管的目录里（避免把批注文件本身的增删当成源文档事件） */
+	ownsFile(path: string): boolean {
+		const dir = this.dir();
+		return Boolean(dir) && (path === dir || path.startsWith(`${dir}/`));
+	}
+
+	/**
+	 * 源文档移动/改名：把它的批注文件连同截图目录搬到新位置，让「批注文件路径 = 源路径镜像」
+	 * 这个不变量维持住（这样读取就不必靠猜，删除清理也不会把移动当成删除）。
+	 * 目标已存在（同名冲突）就不动，交给读取时的按名兜底。
+	 */
+	async moveSidecarFor(oldSourcePath: string, newSourcePath: string): Promise<boolean> {
+		const from = this.sidecarPathOf(oldSourcePath);
+		const to = this.sidecarPathOf(newSourcePath);
+		if (from === to) return false;
+		const text = await this.io.readText(from);
+		if (text === null) return false;
+		if ((await this.io.readText(to)) !== null) return false;
+
+		const doc = parseAnnotationDoc(text, from);
+		const fromAssets = this.assetsDirOf(from);
+		const toAssets = this.assetsDirOf(to);
+		try {
+			await this.io.migrateDir(fromAssets, toAssets);
+		} catch {
+			// 截图搬不动不影响批注本身
+		}
+		doc.sourcePath = newSourcePath;
+		doc.selfPath = to;
+		doc.updated = nowIso();
+		for (const entry of doc.entries) {
+			// 批注里指向截图的路径跟着一起改，否则搬完图就断了
+			if (entry.pdf?.image?.startsWith(fromAssets)) {
+				entry.pdf.image = toAssets + entry.pdf.image.slice(fromAssets.length);
+			}
+		}
+		await this.io.writeText(to, renderAnnotationDoc(doc));
+		await this.io.remove(from);
+		return true;
 	}
 
 	/** 删除某个源文档的批注文件（连同截图），源文档本身不动 */

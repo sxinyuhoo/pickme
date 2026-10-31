@@ -44,6 +44,8 @@ export interface AskParams {
 const LEGACY_TEMPLATE_DIR = '90-模板/pickme';
 /** 索引表文件名：它是插件内部产物，路径固定为「插件目录/这个文件名」，不给用户改 */
 const INDEX_FILE_NAME = 'annotations-index.md';
+/** 孤儿批注的宽限期：首次发现后至少隔这么久、且再判定一次仍是孤儿才清理 */
+const ORPHAN_GRACE_MS = 60_000;
 
 export default class PickmePlugin extends Plugin {
 	settings: PickmeSettings = DEFAULT_SETTINGS;
@@ -115,11 +117,24 @@ export default class PickmePlugin extends Plugin {
 				);
 			}),
 		);
+		// 源文档移动/改名：批注文件跟着走，维持「批注路径 = 源路径镜像」这个不变量。
+		// 文件夹改名时 Obsidian 会为里面每个文件各发一次，所以这里只处理文件即可。
+		this.registerEvent(
+			this.app.vault.on('rename', (file, oldPath) => {
+				if (!(file instanceof TFile)) return;
+				if (this.repository.ownsFile(file.path) || this.repository.ownsFile(oldPath)) return;
+				void this.moveAnnotationsWith(file.path, oldPath);
+			}),
+		);
 		// 源文档被删除：它留下的批注文件不该继续占位（移动或改名不算删除，见 resolveSourceFile）
 		this.registerEvent(
 			this.app.vault.on('delete', (file) => {
 				if (!(file instanceof TFile) || !this.settings.pruneOrphanAnnotations) return;
-				void this.pruneAnnotationsFor(file.path);
+				// 批注文件自己的增删不是源文档事件
+				if (this.repository.ownsFile(file.path)) return;
+				// 延后一点再判定：删除事件触发时库索引往往还没更新，
+				// 「复制+删除」式移动里那个同名副本可能也还没被索引到
+				window.setTimeout(() => void this.pruneAnnotationsFor(file.path), 1200);
 			}),
 		);
 		// 启动时再补扫一遍历史遗留。等布局就绪后再缓两秒，避免库还没加载完就把「暂时看不见」当成「文件没了」
@@ -267,9 +282,23 @@ export default class PickmePlugin extends Plugin {
 		throw new Error('unexpected view');
 	}
 
+	/** 源文档移动/改名：把它的批注文件搬到新位置（搬不动就维持原样，读取时有按名兜底） */
+	private async moveAnnotationsWith(newPath: string, oldPath: string): Promise<void> {
+		try {
+			if (await this.repository.moveSidecarFor(oldPath, newPath)) await this.refreshViews();
+		} catch {
+			// 搬不动不算错，读取时的四层兜底仍然能用
+		}
+	}
+
 	/** 源文档被删掉了：按路径精确收掉它的批注文件与截图（只动这一个源文档的批注） */
 	private async pruneAnnotationsFor(sourcePath: string): Promise<void> {
 		try {
+			// 「复制 + 删除」式的移动：旧路径没了但**另一个**同名文档还在，这种情况不能当作删除。
+			// 注意解除引用：删除事件触发时库索引往往还没更新，这时按名会解析到「刚被删掉的那条路径」，
+			// 那不算「还在」，否则真删除永远清不掉。
+			const resolved = this.resolveSourceFile(sourcePath);
+			if (resolved && resolved.path !== sourcePath) return;
 			const removed = await this.repository.removeDocFor(sourcePath);
 			if (removed > 0) new Notice(t('pickme：已删除 {v0} 条批注（源文档已不在）', { v0: removed }));
 			await this.refreshViews();
@@ -284,7 +313,12 @@ export default class PickmePlugin extends Plugin {
 	 */
 	async pruneOrphanAnnotations(): Promise<string[]> {
 		try {
-			const removed = await this.repository.pruneOrphanDocs((path) => this.resolveSourceFile(path));
+			const removed = await this.repository.pruneOrphanDocs(
+				(path) => this.resolveSourceFile(path),
+				this.settings.orphanFirstSeen,
+				ORPHAN_GRACE_MS,
+			);
+			await this.saveSettings();
 			if (removed.length) {
 				new Notice(t('pickme：已清理 {v0} 个已删除文档的批注', { v0: removed.length }));
 				await this.refreshViews();
@@ -302,9 +336,14 @@ export default class PickmePlugin extends Plugin {
 	resolveSourceFile(path: string): TFile | null {
 		const direct = this.app.vault.getAbstractFileByPath(path);
 		if (direct instanceof TFile) return direct;
-		const name = (path.split('/').pop() ?? '').replace(/\.md$/, '');
+		// 剥掉最后一个后缀：Obsidian 的 basename 是不带后缀的（论文.pdf → 论文），
+		// 只剥 .md 的话 .pdf 这类文件名永远比不中
+		const fileName = path.split('/').pop() ?? '';
+		const name = fileName.replace(/\.[^.]+$/, '');
 		const linked =
-			this.app.metadataCache.getFirstLinkpathDest(name, '') ?? this.app.metadataCache.getFirstLinkpathDest(path, '');
+			this.app.metadataCache.getFirstLinkpathDest(name, '') ??
+			this.app.metadataCache.getFirstLinkpathDest(fileName, '') ??
+			this.app.metadataCache.getFirstLinkpathDest(path, '');
 		if (linked instanceof TFile) return linked;
 		const sameName = this.app.vault.getFiles().filter((candidate) => candidate.basename === name);
 		return sameName.length === 1 ? sameName[0] : null;

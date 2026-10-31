@@ -2,6 +2,15 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.0.17
+
+### Changed
+
+- **Annotation files now move with their source document** (the change 1.0.16 was leading up to). Moving or renaming a note or PDF moves its annotation file, and its region screenshots, to the matching place inside the plugin folder, and rewrites the paths that point at those screenshots. The mirrored-path invariant therefore holds again, which means reading no longer has to guess and — more importantly — a move or a rename can no longer be mistaken for a deletion.
+- The delete handler waits a moment and then double-checks: if **another** document with the same name exists (the copy-then-delete way of moving a file in Finder), the annotations are kept. Previously the check ran while the vault index had not caught up, so a real deletion could never be cleaned.
+- The startup sweep now asks for the same judgement twice: an orphan is only cleaned if a previous run already saw it as an orphan (and at least a minute has passed), which covers renames done while Obsidian was closed and vaults that have not finished syncing. A delete that goes through Obsidian still cleans up immediately.
+- Fixed a file-name match that only stripped `.md`: documents like `.pdf` never matched when resolving by name, so the guard above would not have held for them.
+
 ## 1.0.16
 
 ### Added
