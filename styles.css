@@ -673,17 +673,19 @@ body.pickme-mark-border .pickme-mark {
    批注索引
    ========================================================== */
 
-/* 索引视图自己管内边距，别和主题的 view-content 叠加成两层 */
+/* 索引视图自己管内边距，别和主题的 view-content 叠加成两层。
+   注意：视图根元素本身就带 view-content 类，选择器权重比 .pickme-index 高，
+   所以边距必须在这里给出，否则会被这条规则压成 0（内容贴边） */
 .workspace-leaf-content[data-type="pickme-index-view"] .view-content {
-	padding: 0;
+	padding: 12px 12px 32px;
 	overflow: hidden;
 }
 
 /* ================= 批注索引 ================= */
 /* 三层就够：面板标题 > 文档组（小字、低调）> 批注行 > 元信息（最弱、只做定位） */
 .pickme-index {
-	/* 索引视图把 view-content 的 padding 清零了，留白得自己给：四周都要呼吸 */
-	padding: 18px 14px 34px;
+	/* 和单文档侧边栏同一套边距（实测侧边栏是 12/12/32），行内再缩进 8px */
+	padding: 12px 12px 32px;
 }
 
 /* 标题与统计分两行：标题是标题，统计是它的注脚，别再挤在一行抢地盘 */
@@ -691,26 +693,26 @@ body.pickme-mark-border .pickme-mark {
 	flex-direction: column;
 	align-items: flex-start;
 	gap: 3px;
-	padding: 0 8px 14px;
+	padding: 0 2px 12px;
 	border-bottom: none;
 }
 
 .pickme-index .pickme-file {
-	font-size: 13px;
+	font-size: var(--pk-fs-title);
 	font-weight: 600;
-	letter-spacing: -0.1px;
+	letter-spacing: 0.1px;
 }
 
 .pickme-index .pickme-count {
-	font-size: 10px;
-	color: color-mix(in srgb, var(--pk-ink) 52%, transparent);
+	font-size: var(--pk-fs-sm);
+	color: var(--pk-ink4);
 	font-variant-numeric: tabular-nums;
 }
 
 .pickme-index-tools {
 	gap: 6px;
-	margin: 0 0 16px;
-	padding: 0 8px;
+	margin: 0 0 14px;
+	padding: 0 2px;
 	flex-wrap: nowrap;
 }
 
@@ -808,7 +810,7 @@ body.pickme-mark-border .pickme-mark {
 	align-items: center;
 	gap: 7px;
 	margin: 0;
-	padding: 0 8px 7px;
+	padding: 0 8px 7px 10px;
 	border-bottom: none;
 }
 
@@ -848,7 +850,7 @@ body.pickme-mark-border .pickme-mark {
 	display: flex;
 	align-items: center;
 	gap: 10px;
-	padding: 7px 16px;
+	padding: 7px 16px 7px 18px;
 	margin: 0 -8px;
 	border-left: none;
 	border-radius: 0;
@@ -860,8 +862,8 @@ body.pickme-mark-border .pickme-mark {
 .pickme-index-entry + .pickme-index-entry::before {
 	content: '';
 	position: absolute;
-	left: 80px; /* 从缩略图之后起笔，正文那一列才干净 */
-	right: 16px;
+	left: 74px; /* 从缩略图之后起笔，正文那一列才干净 */
+	right: 18px;
 	top: 0;
 	height: 1px;
 	background: var(--pk-line);
@@ -1636,14 +1638,39 @@ body.pickme-mark-border .pickme-mark {
 }
 
 .pickme-pdf-mark.is-flash .pickme-pdf-band,
-.pickme-pdf-mark.is-flash .pickme-pdf-box {
-	outline: 2px solid var(--pk-acc);
+.pickme-pdf-mark.is-flash .pickme-pdf-box,
+.pickme-pdf-mark.is-flash .pickme-pdf-label {
+	outline: 2px solid transparent;
 	outline-offset: 1px;
+	animation: pickme-flash 0.42s ease-in-out 2;
 }
 
-.pickme-pdf-mark.is-flash .pickme-pdf-label {
-	outline: 2px solid var(--pk-acc);
-	outline-offset: 1px;
+/* 正文里的标记：同样的两次呼吸，不改变它自己的底色/下划线样式 */
+.pickme-mark.is-flash {
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	border-radius: 2px;
+	animation: pickme-flash 0.42s ease-in-out 2;
+}
+
+@keyframes pickme-flash {
+	0%,
+	100% {
+		outline-color: transparent;
+	}
+	50% {
+		outline-color: var(--pk-acc);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.pickme-mark.is-flash,
+	.pickme-pdf-mark.is-flash .pickme-pdf-band,
+	.pickme-pdf-mark.is-flash .pickme-pdf-box,
+	.pickme-pdf-mark.is-flash .pickme-pdf-label {
+		animation: none;
+		outline-color: var(--pk-acc);
+	}
 }
 
 /* 便利贴：页面上只留一个小图标，内容点开才看（有内容是实心，空的是虚线） */

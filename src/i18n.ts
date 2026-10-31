@@ -71,7 +71,6 @@ export const EN: Record<string, string> = {
 	'对选区提问或批注': 'Ask or annotate the selection',
 	'新建提问模板': 'New prompt template',
 	'新建模板': 'New template',
-	'新建': 'New',
 	'框选时把这块区域裁成 PNG 存在批注旁边，提问时作为图片送给模型。不需要图文问答就关掉，能省下这些图占的空间。':
 		'Cuts the region you select into a PNG stored next to the annotation, and sends it to the model as an image. Turn it off if you do not need image Q&A — that saves the space these files take.',
 	'截图等比缩到这个边长再存：越小越省 token，字也越小。0 表示不缩放。':
@@ -90,8 +89,6 @@ export const EN: Record<string, string> = {
 	'边生成边显示，回答一个字一个字地出来；关掉则等全部生成完再显示。流式只在浏览器请求通道可用。':
 		'Show the answer as it is generated, word by word. Turn it off to wait for the whole answer. Streaming is only available over the browser request path.',
 	'深度思考': 'Deep thinking',
-	'开启后模型先推理再作答，质量更好也更慢。思考有独立预算，不占「最大输出长度」；提问面板上可以按次取消。':
-		'When on, the model reasons before answering: better quality, slower. Thinking has its own budget and does not eat into "Max output length". The ask panel can turn it off for one question.',
 	'测试连接': 'Test connection',
 	'按上面的地址与密钥发一次最小请求，确认能不能通。':
 		'Sends one minimal request to the address and key above to check whether they work.',
@@ -191,7 +188,6 @@ export const EN: Record<string, string> = {
 	'正文选区': 'Text selection',
 	'正文里写成一对尖括号标签，默认 pickme。改动标签名后，已有锚点需要重新插入才能识别。': 'Written in the note as a pair of angle-bracket tags, pickme by default. After you change the tag name, existing anchors must be re-inserted to be recognized.',
 	'每行一个，或用逗号分隔。侧边栏的下拉会列出这些模型，留空则只能使用默认模型。': 'One per line, or separated by commas. The sidebar dropdown lists these models; leave empty to use only the default model.',
-	'测试': 'Test',
 	'添加批注后自动打开提问面板': 'Auto-open ask panel after annotating',
 	'渲染失败：{v0}': 'Render failed: {v0}',
 	'用户会给出选区，可能还有上下文片段。': 'The user provides a selection, sometimes with a context snippet.',
@@ -217,7 +213,6 @@ export const EN: Record<string, string> = {
 	'输入锚点 id 或选区片段': 'Enter an anchor id or a fragment of the selection',
 	'输入问题，或选择上面的模板后直接发送': 'Type a question, or pick a template above and send it right away',
 	'输入问题，或选模板后直接发送（⌘/Ctrl + Enter）': 'Type a question, or pick a template and send it right away (⌘/Ctrl + Enter)',
-	'迁移': 'Migrate',
 	'迁移批注目录': 'Migrate annotation folder',
 	'还没有批注。选中文字后右键，或用命令「对选区提问或批注」。':
 		'No annotations yet. Select some text and right-click, or run the "Ask or annotate the selection" command.',
@@ -307,7 +302,6 @@ export const EN: Record<string, string> = {
 	// 模板设置
 	'打开模板目录': 'Open templates folder',
 	'恢复默认模板': 'Restore default templates',
-	'恢复': 'Restore',
 	'内置模板': 'Built-in',
 	'删除模板': 'Delete template',
 	'删除内置模板「{name}」？文件会被删掉，需要时可以用「恢复默认模板」找回来。':
@@ -315,8 +309,9 @@ export const EN: Record<string, string> = {
 	'删除模板「{name}」？文件会被删掉。': 'Delete template "{name}"? The file will be deleted.',
 	'模板目录里还没有模板，点上面的「恢复默认模板」生成内置的 3 个。':
 		'No templates in the folder yet — use "Restore default templates" above to create the 3 built-ins.',
-	'模板放在插件自己的目录里，不用改。目录里每个 .md 就是一个模板，文件名就是下拉里显示的名字。想自己加模板，点右边打开目录，或者用下面的「新建模板」。':
-		'Templates live in the plugin folder and do not need to change. Each .md file is one template; the file name is what shows in the dropdown. To add your own, open the folder on the right or use "New template" below.',
+	'模板放在插件自己的目录里，不用改。目录里每个 .md 就是一个模板，文件名就是下拉里显示的名字。想自己加模板，用下面的「打开模板目录」或「新建模板」。':
+		'Templates live in the plugin folder and do not need to change. Each .md file is one template; the file name is what shows in the dropdown. To add your own, use "Open templates folder" or "New template" below.',
+	'模板清单': 'Template list',
 	'把内置的 3 个模板（解释、摘要、翻译）重新写进模板目录，已经存在的不覆盖。删掉的、改坏了的，用这个找回来。':
 		'Rewrite the 3 built-in templates (Explain, Summarize, Translate) into the templates folder; existing files are kept. Use this to recover deleted or broken ones.',
 	'勾上就在提问面板的下拉里出现；取消勾选只是藏起来，文件不删。新建的模板排在最后。':

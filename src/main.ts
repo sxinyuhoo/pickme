@@ -843,6 +843,36 @@ export default class PickmePlugin extends Plugin {
 	}
 
 	/** 跳到锚点在原文里的位置并选中 */
+	/**
+	 * 跳到批注之后让它闪两下。
+	 * 同一页批注一多，光靠选区很难一眼找到位置；闪两下是最省事的定位手段。
+	 * PDF 的标记是异步画出来的（翻页后要等渲染），所以要重试几次直到元素出现。
+	 */
+	private flashEntry(id: string, file: TFile, attempt = 0): void {
+		const selector = `[data-pickme-id="${CSS.escape(id)}"]`;
+		const found: HTMLElement[] = [];
+		const pdf = this.pdfViewFor(file.path);
+		if (pdf) {
+			pdf.leaf.view.containerEl.querySelectorAll<HTMLElement>(selector).forEach((el) => found.push(el));
+		}
+		for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
+			const view = leaf.view;
+			if (!(view instanceof MarkdownView) || view.file?.path !== file.path) continue;
+			view.containerEl.querySelectorAll<HTMLElement>(`.pickme-mark${selector}`).forEach((el) => found.push(el));
+		}
+		if (found.length === 0) {
+			// 最多等 1.2 秒：翻页后的渲染队列走完才能取到标记
+			if (attempt < 6) window.setTimeout(() => this.flashEntry(id, file, attempt + 1), 200);
+			return;
+		}
+		for (const el of found) {
+			el.addClass('is-flash');
+			el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+		}
+		// 0.42s × 2 次，留一点余量再摘掉类
+		window.setTimeout(() => found.forEach((el) => el.removeClass('is-flash')), 1000);
+	}
+
 	async jumpToAnchor(id: string, file?: TFile | null): Promise<void> {
 		const target = file ?? this.activeFile();
 		if (!target) {
@@ -862,12 +892,14 @@ export default class PickmePlugin extends Plugin {
 			if (openView) {
 				await this.app.workspace.revealLeaf(openView.leaf);
 				await openView.focusEntry(id);
+				this.flashEntry(id, target);
 				return;
 			}
 			if (this.settings.pdfViewerEnabled) {
 				await this.openPdfInPickmeView(target);
 				const created = this.pdfViewFor(target.path);
 				await created?.focusEntry(id);
+				this.flashEntry(id, target);
 				return;
 			}
 			const pdfLeaf = this.app.workspace.getLeaf(false);
@@ -890,6 +922,7 @@ export default class PickmePlugin extends Plugin {
 		const to = editor.offsetToPos(pair.end);
 		editor.setSelection(from, to);
 		editor.scrollIntoView({ from, to }, true);
+		this.flashEntry(id, target);
 	}
 
 	/** 侧边栏或正文里点击批注：跳转并高亮 */
