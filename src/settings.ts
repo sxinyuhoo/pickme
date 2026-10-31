@@ -10,6 +10,8 @@ import { ConfirmModal } from './ui/confirmModal.ts';
 export interface PickmeSettings {
 	/** 批注目录，默认在插件目录下，完全隐藏 */
 	annotationDir: string;
+	/** 源文档被删除后，自动清理它留下的批注文件（含区域截图） */
+	pruneOrphanAnnotations: boolean;
 	/** 模板目录 */
 	templateDir: string;
 	/** 批注索引笔记路径，留空表示不生成 */
@@ -85,6 +87,7 @@ export const DEFAULT_SETTINGS: PickmeSettings = {
 	// 空字符串表示「放在插件自己的目录里」，加载设置时按 manifest.dir 补全；
 	// 不写死 .obsidian/plugins/<id>/... —— 用户改了插件目录名也不会错（官方 lint 规则 hardcoded-config-path）
 	annotationDir: '',
+	pruneOrphanAnnotations: true,
 	templateDir: '',
 	tagName: DEFAULT_TAG,
 	apiBaseUrl: 'https://api.openai.com/v1',
@@ -198,6 +201,15 @@ export class PickmeSettingTab extends PluginSettingTab {
 						this.plugin.settings.createEmptyAnnotationFile = value;
 						await this.plugin.saveSettings();
 					}),
+			);
+		new Setting(containerEl)
+			.setName(t('源文档删除后清理批注'))
+			.setDesc(t('源文档被删除时，自动收掉它留下的批注文件与区域截图（移动或改名的文档不受影响）。'))
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.pruneOrphanAnnotations).onChange(async (value) => {
+					this.plugin.settings.pruneOrphanAnnotations = value;
+					await this.plugin.saveSettings();
+				}),
 			);
 		new Setting(containerEl).setName(t('模板')).setHeading();
 		// 模板目录固定在插件目录下（隐藏，不占库结构），只给一个打开的入口

@@ -82,10 +82,12 @@ export class AnnotationRepository {
 			doc.sourceType = sourceType;
 			return { doc, filePath: path };
 		}
-		// 文档被移动/改名后，批注文件的路径还停在旧位置：按文件名兜底找一次（只认唯一命中，不猜）
-		const suffix = `/${sourceFile.name}.md`;
+		// 文档被移动/改名后，批注文件的路径还停在旧位置：按文件名兜底找一次（只认唯一命中，不猜）。
+		// 文件名要用仓库自己的换算结果——markdown 源是「笔记.md」，pdf 源是「文档.pdf.md」，
+		// 自己拼后缀会在 md 上拼成 .md.md，永远匹配不到。
+		const expectedName = path.split('/').pop() ?? '';
 		const files = await this.io.listFiles(this.dir());
-		const candidates = files.filter((candidate) => candidate.endsWith(suffix));
+		const candidates = files.filter((candidate) => (candidate.split('/').pop() ?? '') === expectedName);
 		if (candidates.length === 1) {
 			const moved = await this.io.readText(candidates[0]);
 			if (moved !== null) {
@@ -107,6 +109,56 @@ export class AnnotationRepository {
 			},
 			filePath: null,
 		};
+	}
+
+	/**
+	 * 清理「源文档已经不在库里」的批注文件（源文档被删除的情况）。
+	 * 只认唯一判定：存的路径找不到、且按文件名也找不到——刚移动过的文档因此不会被误删。
+	 * 批注文件连同它的区域截图一起收掉，返回被清理的源文档路径。
+	 */
+	async pruneOrphanDocs(resolveSource: (path: string) => TFile | null): Promise<string[]> {
+		const removed: string[] = [];
+		const dir = this.dir();
+		for (const path of await this.io.listFiles(dir)) {
+			if (!path.endsWith('.md')) continue;
+			const text = await this.io.readText(path);
+			if (text === null) continue;
+			const doc = parseAnnotationDoc(text, path);
+			const sourcePath = this.sourcePathOf(path, doc);
+			if (!sourcePath) continue;
+			if (resolveSource(sourcePath)) continue;
+			for (const entry of doc.entries) {
+				if (entry.pdf?.image) await this.io.remove(entry.pdf.image);
+			}
+			await this.io.remove(path);
+			// 截图目录是 <批注目录>/_assets/<批注文件名>/，空了就一起收掉
+			const parts = path.split('/');
+			const assets = [...parts.slice(0, -1), '_assets', parts[parts.length - 1]].join('/');
+			await this.io.pruneEmptyFolder(assets);
+			await this.io.pruneEmptyFolder(parts.slice(0, -1).join('/') + '/_assets');
+			removed.push(sourcePath);
+		}
+		return removed;
+	}
+
+	/** 某个源文档对应的批注文件路径（源文档被删除时按路径精确清理用） */
+	sidecarPathFor(sourcePath: string): string {
+		return this.sidecarPathOf(sourcePath);
+	}
+
+	/** 删除某个源文档的批注文件（连同截图），源文档本身不动 */
+	async removeDocFor(sourcePath: string): Promise<number> {
+		const path = this.sidecarPathOf(sourcePath);
+		const text = await this.io.readText(path);
+		if (text === null) return 0;
+		const doc = parseAnnotationDoc(text, path);
+		for (const entry of doc.entries) {
+			if (entry.pdf?.image) await this.io.remove(entry.pdf.image);
+		}
+		await this.io.remove(path);
+		const parts = path.split('/');
+		await this.io.pruneEmptyFolder([...parts.slice(0, -1), '_assets', parts[parts.length - 1]].join('/'));
+		return doc.entries.length;
 	}
 
 	/** 某个目录下的批注文件数，用于判断是否需要迁移 */

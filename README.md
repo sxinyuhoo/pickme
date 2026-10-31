@@ -125,6 +125,7 @@ One line per release; the full notes live in [CHANGELOG.md](./CHANGELOG.md).
 
 | Version | Highlights |
 | --- | --- |
+| 1.0.16 | Annotations and screenshots are cleaned up when their source document is deleted (moved or renamed documents are unaffected; can be turned off) |
 | 1.0.15 | Fast multi-line strokes fill in the lines they skipped; the index survives moving or renaming a document; smaller cursor that becomes a bare stroke while drawing |
 | 1.0.14 | Fixed: a multi-line selection in a note was saved as its first line only, then marked stale (community contribution) |
 | 1.0.13 | Saving a sticky note closes its box |

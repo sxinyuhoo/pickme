@@ -2,6 +2,12 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.0.16
+
+### Added
+
+- **Annotations for a deleted document are cleaned up automatically.** Deleting a note or PDF used to leave its annotation file (and region screenshots) behind, still listed in the index. Now the plugin reacts to the delete, removes that file's annotations together with their screenshots, and sweeps anything left over from earlier at startup. The sweep only treats a document as gone when **both** its stored path and its file name resolve to nothing — so a moved or renamed document keeps its annotations (that is what 1.0.15 was about). A notice tells you how many were removed, and the whole behaviour has a setting (on by default).
+
 ## 1.0.15
 
 ### Fixed

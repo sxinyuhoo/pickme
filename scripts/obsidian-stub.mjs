@@ -32,6 +32,25 @@ export function createObsidianStub() {
 	/** 冷启动时库索引尚未就绪：getAbstractFileByPath 对已存在文件/目录也返回 null */
 	indexStale = false;
 
+	/** 事件（真机里 vault.on('delete') 用来清理批注文件）；冒烟里用 trigger('delete', file) 模拟 */
+	handlers = new Map();
+
+	on(name, callback) {
+		const list = this.handlers.get(name) ?? [];
+		list.push(callback);
+		this.handlers.set(name, list);
+		return { name, callback };
+	}
+
+	off(name, callback) {
+		const list = this.handlers.get(name) ?? [];
+		this.handlers.set(name, list.filter((item) => item !== callback));
+	}
+
+	trigger(name, payload) {
+		for (const callback of this.handlers.get(name) ?? []) callback(payload);
+	}
+
 		constructor() {
 			this.files = new Map();
 			this.folders = new Set(['']);
@@ -186,6 +205,16 @@ export function createObsidianStub() {
 	}
 
 	const workspace = new Events();
+	// 真机上布局就绪时一定会回调；桩件里不自动触发——否则冒烟会跑到「启动扫描清理批注」那段，
+	// 需要时手动 workspace.triggerLayoutReady()
+	workspace.layoutCallbacks = [];
+	workspace.onLayoutReady = (callback) => {
+		workspace.layoutCallbacks.push(callback);
+		return callback;
+	};
+	workspace.triggerLayoutReady = () => {
+		for (const callback of workspace.layoutCallbacks.splice(0)) callback();
+	};
 	workspace.getActiveViewOfType = () => null;
 	workspace.getLeavesOfType = () => [];
 	workspace.getRightLeaf = () => null;

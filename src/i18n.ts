@@ -253,6 +253,10 @@ export const EN: Record<string, string> = {
 	'连同便利贴一起删掉': 'Delete this sticky note as well',
 	'删掉这张便利贴？': 'Delete this sticky note?',
 	'便利贴已移动': 'Sticky note moved',
+	'源文档删除后清理批注': 'Clean up annotations when the source is deleted',
+	'源文档被删除时，自动收掉它留下的批注文件与区域截图（移动或改名的文档不受影响）。': 'When a source document is deleted, remove the annotation files and region screenshots it left behind (moved or renamed documents are not affected).',
+	'pickme：已清理 {v0} 个已删除文档的批注': 'Pick Me: cleaned up annotations for {v0} deleted document(s)',
+	'pickme：已删除 {v0} 条批注（源文档已不在）': 'Pick Me: removed {v0} annotation(s) whose source document is gone',
 	'写点什么…（⌘/Ctrl + Enter 保存）': 'Write something… (⌘/Ctrl + Enter to save)',
 
 	'这里没有可取的文字，切到框选可框选区域': 'No selectable text here — switch to region mode to select an area',

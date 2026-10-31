@@ -115,6 +115,19 @@ export default class PickmePlugin extends Plugin {
 				);
 			}),
 		);
+		// 源文档被删除：它留下的批注文件不该继续占位（移动或改名不算删除，见 resolveSourceFile）
+		this.registerEvent(
+			this.app.vault.on('delete', (file) => {
+				if (!(file instanceof TFile) || !this.settings.pruneOrphanAnnotations) return;
+				void this.pruneAnnotationsFor(file.path);
+			}),
+		);
+		// 启动时再补扫一遍历史遗留。等布局就绪后再缓两秒，避免库还没加载完就把「暂时看不见」当成「文件没了」
+		this.app.workspace.onLayoutReady(() => {
+			if (!this.settings.pruneOrphanAnnotations) return;
+			window.setTimeout(() => void this.pruneOrphanAnnotations(), 2000);
+		});
+
 		// 文件列表右键也能送进 Pick Me 查看器
 		this.registerEvent(
 			this.app.workspace.on('file-menu', (menu, file) => {
@@ -252,6 +265,34 @@ export default class PickmePlugin extends Plugin {
 		const view = leaf.view;
 		if (view instanceof PickmeIndexView) return view;
 		throw new Error('unexpected view');
+	}
+
+	/** 源文档被删掉了：按路径精确收掉它的批注文件与截图（只动这一个源文档的批注） */
+	private async pruneAnnotationsFor(sourcePath: string): Promise<void> {
+		try {
+			const removed = await this.repository.removeDocFor(sourcePath);
+			if (removed > 0) new Notice(t('pickme：已删除 {v0} 条批注（源文档已不在）', { v0: removed }));
+			await this.refreshViews();
+		} catch {
+			// 清理失败不影响其它功能
+		}
+	}
+
+	/**
+	 * 扫一遍批注目录：源文档已经不在库里的（删除过，且按文件名也找不到）连批注一起收掉。
+	 * 只认「路径找不到 + 按名也找不到」，所以移动/改名的文档不会被误删。
+	 */
+	async pruneOrphanAnnotations(): Promise<string[]> {
+		try {
+			const removed = await this.repository.pruneOrphanDocs((path) => this.resolveSourceFile(path));
+			if (removed.length) {
+				new Notice(t('pickme：已清理 {v0} 个已删除文档的批注', { v0: removed.length }));
+				await this.refreshViews();
+			}
+			return removed;
+		} catch {
+			return [];
+		}
 	}
 
 	/**
