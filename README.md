@@ -87,10 +87,13 @@ Only pages near the viewport are rendered; far-away canvases are released and re
 Run the command **Open annotation index** to get a sidebar listing every annotation in the vault, grouped by source document: selection snippet or PDF page, question count, anchor id and creation time.
 
 - Click a document name to open it; click an entry to open the source and jump to that annotation. Fully keyboard operable (Tab + Enter).
+- **Multi-select and batch delete**: toggle *Multi-select* in the toolbar and tick rows (click the checkbox or the row itself); a selection bar appears with the count, *Select all*, *Clear selection* and *Delete selected* — the delete button stays disabled while nothing is picked. Keyboard works too: `↑↓` to move, `Space` to tick, `Mod+A` for all, `Delete` to delete. It asks first and spells out the consequences: the anchor tags in the source are removed with the annotation, nothing else in the note is touched, and region screenshots go with it.
 - PDF annotations carry a thumbnail of the region; text annotations show the snippet.
 - Filter box on top (document name, selection text or anchor id).
 - Annotations whose anchor can no longer be found in the source (you edited that paragraph, or deleted the tag pair) are **never deleted** and never mixed into the normal list: they collect into a collapsible `Stale (N)` row at the end of each group, with the reason spelled out. Use the command **Rebind stale anchors** to re-attach one by re-selecting the text in the source.
 - The index reads the annotation files directly, so it is always current. The plugin also maintains an `annotations-index.md` summary inside its own (hidden) plugin folder — an internal artifact with no setting; handlers that want it can point Dataview at the plugin folder.
+
+![Multi-select and batch delete in the annotation index](docs/screenshots/07-index-multi-select.png)
 
 ### Templates
 

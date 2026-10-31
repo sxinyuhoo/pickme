@@ -2,6 +2,11 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.1.1
+
+- 修下拉框：模板、模型两个选择框的箭头会压住文字 / 看不见，现在箭头自己画、右侧留出内边距
+- README 截图按 1.1.0 的新界面全部重拍，并补上批注索引多选与批量删除的截图
+
 ## 1.1.0
 
 界面全线重做，功能不变。

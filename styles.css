@@ -228,7 +228,18 @@ body.theme-dark {
 .pickme-sidebar select,
 .pickme-panel select {
 	font-size: var(--pk-fs-sm);
-	padding: 2px 6px;
+	/* 右内边距必须给箭头留位；箭头自己画，别指望主题自带的那个（会被上游的 background-image: none 清掉） */
+	padding: 3px 20px 3px 7px;
+	appearance: none;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.6l3 3 3-3' fill='none' stroke='%238A8E9C' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 6px center;
+	background-size: 10px 10px;
+	height: auto;
+	min-height: 0;
+	line-height: 1.5;
+	max-width: 52%;
+	text-overflow: ellipsis;
 	color: var(--pk-ink3);
 }
 
