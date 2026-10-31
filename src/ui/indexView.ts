@@ -289,12 +289,24 @@ export class PickmeIndexView extends ItemView {
 		// PDF 批注带框选区域的小图，一眼认得出是哪张
 		if (entry.kind === 'pdf' && entry.pdf?.image) {
 			const thumb = row.createEl('img', { cls: 'pickme-index-thumb' });
-			// 截图文件可能已经不在（清理过、或手动删过），加载失败就整块收掉，别留一个浏览器破图标
-			thumb.addEventListener('error', () => thumb.addClass('is-broken'), { once: true });
+			// 截图文件可能已经不在（清理过、或手动删过）：换成类型图标，槽位不留空、也不出破图标
+			thumb.addEventListener(
+				'error',
+				() => {
+					const fallback = createDiv({ cls: 'pickme-index-kind' });
+					setIcon(fallback, 'highlighter');
+					row.insertBefore(fallback, thumb);
+					thumb.remove();
+				},
+				{ once: true },
+			);
 			thumb.setAttribute('alt', '');
 			void this.plugin.repository.io.resourceUrl(entry.pdf.image).then((url) => {
 				if (url) thumb.src = url;
 			});
+		} else {
+			// 没有截图的行也占住同一块「预览槽」，否则同一组里正文左边界会跳来跳去
+			setIcon(row.createDiv({ cls: 'pickme-index-kind' }), entry.kind === 'pdf' ? 'highlighter' : 'quote');
 		}
 
 		const body = row.createDiv({ cls: 'pickme-index-body' });

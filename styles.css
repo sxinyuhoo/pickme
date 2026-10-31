@@ -581,23 +581,43 @@ body.pickme-mark-border .pickme-mark {
 	overflow: hidden;
 }
 
+/* ================= 批注索引 ================= */
+/* 三层就够：面板标题 > 文档组（小字、低调）> 批注行 > 元信息（最弱、只做定位） */
 .pickme-index {
-	padding-top: 8px;
+	padding-top: 10px;
+}
+
+.pickme-index .pickme-header {
+	align-items: center;
+	padding: 0 2px 9px;
+	border-bottom: none;
+}
+
+.pickme-index .pickme-file {
+	font-size: 12.5px;
+	font-weight: 600;
+	letter-spacing: 0.2px;
+}
+
+.pickme-index .pickme-count {
+	font-size: var(--pk-fs-xs);
+	color: var(--pk-ink5);
+	font-variant-numeric: tabular-nums;
 }
 
 .pickme-index-tools {
-	gap: 6px;
-	margin: 8px 0 8px;
+	gap: 5px;
+	margin: 0 0 11px;
 	flex-wrap: nowrap;
 }
 
 .pickme-index-filter {
-	flex: 1;
+	flex: 1 1 auto;
 	min-width: 0;
+	height: 24px;
+	padding: 0 8px;
 	font-family: var(--font-interface);
-	font-size: var(--pk-fs);
-	height: auto;
-	padding: 3px 8px;
+	font-size: var(--pk-fs-sm);
 	background: var(--pk-surface2);
 	background-image: none;
 	border: 1px solid var(--pk-line);
@@ -650,10 +670,10 @@ body.pickme-mark-border .pickme-mark {
 .pickme-index-list {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 0;
 }
 
-/* 索引里的「文档」分组：不是一张卡，是一段带小标题的列表 */
+/* 文档分组不是卡片，是一段带小标题的列表 */
 .pickme-card.pickme-index-group {
 	border: none;
 	border-radius: 0;
@@ -665,19 +685,28 @@ body.pickme-mark-border .pickme-mark {
 	border-color: transparent;
 }
 
+/* 组与组之间：一道通栏细线 + 一段呼吸，比行间那层更重 */
+.pickme-index-group + .pickme-index-group {
+	margin-top: 6px;
+	padding-top: 12px;
+	border-top: 1px solid var(--pk-line2);
+}
+
 .pickme-index-source {
 	display: flex;
-	align-items: baseline;
-	gap: 6px;
+	align-items: center;
+	gap: 7px;
 	margin: 0;
-	padding: 5px 8px 3px;
-	border-bottom: 1px solid var(--pk-line);
+	padding: 0 8px 8px;
+	border-bottom: none;
 }
 
 .pickme-index-name {
 	font-size: var(--pk-fs-sm);
 	font-weight: 600;
-	color: var(--pk-ink3);
+	letter-spacing: 0.05em;
+	color: var(--pk-ink4);
+	text-decoration: none;
 	cursor: pointer;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -687,25 +716,43 @@ body.pickme-mark-border .pickme-mark {
 
 .pickme-index-name:hover {
 	color: var(--pk-acc-ink);
+	text-decoration: none;
 }
 
+/* 组头的条数：一个安静的胶囊，别用强调色抢戏 */
 .pickme-index-source .pickme-count {
 	margin-left: auto;
-	font-size: var(--pk-fs-xs);
-	color: var(--pk-ink5);
+	padding: 1px 6px;
+	font-size: 8.5px;
+	line-height: 1.4;
+	color: color-mix(in srgb, var(--pk-ink) 56%, transparent);
+	background: var(--pk-surface2);
+	border-radius: var(--pk-pill);
+	font-variant-numeric: tabular-nums;
 }
 
-/* 一行一条批注：左侧 2px 的选中条，hover 只抬一档底色 */
+/* 一行一条批注：左侧 2px 选中条，行间只给一道内缩的细线 */
 .pickme-index-entry {
+	position: relative;
 	display: flex;
-	align-items: flex-start;
-	gap: 8px;
-	padding: 4.5px 8px;
+	align-items: center;
+	gap: 9px;
+	padding: 6px 8px;
 	margin: 0;
 	border-left: 2px solid transparent;
-	border-radius: 0 var(--pk-r-sm) var(--pk-r-sm) 0;
+	border-radius: 0;
 	cursor: pointer;
 	transition: var(--pk-t);
+}
+
+.pickme-index-entry + .pickme-index-entry::before {
+	content: '';
+	position: absolute;
+	left: 11px;
+	right: 11px;
+	top: 0;
+	height: 1px;
+	background: var(--pk-line);
 }
 
 .pickme-index-entry:hover {
@@ -717,11 +764,13 @@ body.pickme-mark-border .pickme-mark {
 .pickme-index-entry.is-active {
 	background: var(--pk-acc-soft);
 	border-left-color: var(--pk-acc);
+	border-radius: 0 var(--pk-r-sm) var(--pk-r-sm) 0;
 }
 
 /* 键盘游标所在的那一行：只加一圈内描边，不抢选中态的强调色底子 */
 .pickme-index-entry.is-cursor {
 	box-shadow: inset 0 0 0 1px var(--pk-acc-line);
+	border-radius: var(--pk-r-sm);
 }
 
 /* 单条删除：平时藏着，hover / 聚焦 / 选中 / 游标到位时现形；
@@ -767,20 +816,43 @@ body.pickme-mark-border .pickme-mark {
 	min-width: 0;
 }
 
-/* PDF 批注的框选小图：固定框 + cover，宽扁的区域截图也不会把行压成一条缝 */
-.pickme-index-thumb {
+/* 左侧固定一截「预览槽」：PDF 给框选小图，文本批注给一个图标砖，
+   这样每组里有没有截图，正文的起始位置都对得齐 */
+.pickme-index-thumb,
+.pickme-index-kind {
 	flex: 0 0 auto;
-	width: 52px;
-	height: 36px;
-	object-fit: cover;
+	width: 46px;
+	height: 34px;
 	border: 1px solid var(--pk-line);
 	border-radius: var(--pk-r-sm);
 	background: var(--pk-surface2);
 }
 
+.pickme-index-thumb {
+	object-fit: cover;
+}
+
+.pickme-index-kind {
+	display: grid;
+	place-items: center;
+	color: var(--pk-ink4);
+}
+
+.pickme-index-kind svg {
+	width: 15px;
+	height: 15px;
+	stroke-width: 1.6;
+}
+
+/* 截图文件不在了：保留槽位、只把图藏掉，别让整行往左跳 */
+.pickme-index-thumb.is-broken {
+	opacity: 0;
+}
+
 .pickme-index-what {
 	font-size: var(--pk-fs);
-	line-height: 1.45;
+	font-weight: 500;
+	line-height: 1.4;
 	color: var(--pk-ink);
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -789,26 +861,45 @@ body.pickme-mark-border .pickme-mark {
 
 .pickme-index-entry.is-stale .pickme-index-what {
 	color: var(--pk-ink4);
+	font-weight: 400;
 }
 
+/* 元信息：弱到只做定位，中间用轻点分隔，时间推到行尾对齐 */
 .pickme-index-meta {
 	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-	margin-top: 1px;
-	color: var(--pk-ink3);
+	align-items: center;
+	margin-top: 3px;
 	font-size: var(--pk-fs-xs);
-	line-height: 1.4;
+	line-height: 1.35;
+	color: color-mix(in srgb, var(--pk-ink) 66%, transparent);
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.pickme-index-meta > span {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.pickme-index-meta > span + span:not(.pickme-index-warn)::before {
+	content: '·';
+	margin: 0 5px;
+	color: color-mix(in srgb, var(--pk-ink) 42%, transparent);
+}
+
+.pickme-index-meta > span:last-child:not(.pickme-index-warn) {
+	margin-left: auto;
 }
 
 .pickme-index-meta code,
 .pickme-index-meta .pickme-tag {
 	font-family: var(--font-monospace);
-	font-size: var(--pk-fs-xs);
-	color: var(--pk-ink3);
-	background: var(--pk-surface2);
-	border-radius: 3px;
-	padding: 0 3px;
+	font-size: 8.5px;
+	color: color-mix(in srgb, var(--pk-ink) 58%, transparent);
+	background: none;
+	padding: 0;
 }
 
 .pickme-index-ok {
@@ -816,11 +907,11 @@ body.pickme-mark-border .pickme-mark {
 }
 
 .pickme-index-warn {
+	padding: 0 5px;
+	font-size: 8.5px;
 	color: var(--pk-hot);
 	background: var(--pk-hot-soft);
 	border-radius: var(--pk-pill);
-	padding: 0 5px;
-	font-size: var(--pk-fs-xs);
 }
 
 /* 失效批注默认折起来，展开才逐条列出 */
@@ -1556,10 +1647,6 @@ body.pickme-mark-border .pickme-mark {
 	.pickme-mark,
 }
 
-/* 截图文件可能已经不在（清理过或手动删过）：加载失败就整块收掉，别留破图标 */
-.pickme-index-thumb.is-broken {
-	display: none;
-}
 
 /* 标注方式选中态：底色 + 内描边 + 图标同色，三重确认当前模式 */
 .pickme-pdf-toolbar .pickme-icon-button.is-active {
