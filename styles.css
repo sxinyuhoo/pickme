@@ -421,7 +421,9 @@ body.theme-dark {
 	margin-top: 2px;
 }
 
-.pickme-card {
+/* 侧边栏的批注行：只作用于侧边栏的 .pickme-entries，别误伤索引里的分组
+   （索引分组也带 pickme-card 类，之前就被这条规则画出了一道多余的分隔线） */
+.pickme-entries .pickme-card {
 	position: relative;
 	border: none;
 	border-left: 2px solid transparent;
@@ -431,7 +433,7 @@ body.theme-dark {
 	transition: var(--pk-t);
 }
 
-.pickme-card + .pickme-card::before {
+.pickme-entries .pickme-card + .pickme-card::before {
 	content: '';
 	position: absolute;
 	left: 11px;
@@ -441,18 +443,18 @@ body.theme-dark {
 	background: var(--pk-line);
 }
 
-.pickme-card:hover {
+.pickme-entries .pickme-card:hover {
 	border-left-color: var(--pk-line2);
 	background: var(--pk-surface2);
 }
 
-.pickme-card.is-active {
+.pickme-entries .pickme-card.is-active {
 	border-left-color: var(--pk-acc);
 	border-radius: 0 var(--pk-r-sm) var(--pk-r-sm) 0;
 	background: var(--pk-acc-soft);
 }
 
-.pickme-card.is-stale {
+.pickme-entries .pickme-card.is-stale {
 	opacity: 0.82;
 }
 
@@ -680,44 +682,50 @@ body.pickme-mark-border .pickme-mark {
 /* ================= 批注索引 ================= */
 /* 三层就够：面板标题 > 文档组（小字、低调）> 批注行 > 元信息（最弱、只做定位） */
 .pickme-index {
-	padding-top: 10px;
+	/* 索引视图把 view-content 的 padding 清零了，留白得自己给：四周都要呼吸 */
+	padding: 18px 14px 34px;
 }
 
+/* 标题与统计分两行：标题是标题，统计是它的注脚，别再挤在一行抢地盘 */
 .pickme-index .pickme-header {
-	align-items: center;
-	padding: 0 2px 9px;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 3px;
+	padding: 0 8px 14px;
 	border-bottom: none;
 }
 
 .pickme-index .pickme-file {
-	font-size: 12.5px;
+	font-size: 13px;
 	font-weight: 600;
-	letter-spacing: 0.2px;
+	letter-spacing: -0.1px;
 }
 
 .pickme-index .pickme-count {
-	font-size: var(--pk-fs-xs);
-	color: var(--pk-ink5);
+	padding-left: 2px;
+	font-size: 10px;
+	color: color-mix(in srgb, var(--pk-ink) 52%, transparent);
 	font-variant-numeric: tabular-nums;
 }
 
 .pickme-index-tools {
-	gap: 5px;
-	margin: 0 0 11px;
+	gap: 6px;
+	margin: 0 0 16px;
+	padding: 0 8px;
 	flex-wrap: nowrap;
 }
 
 .pickme-index-filter {
 	flex: 1 1 auto;
 	min-width: 0;
-	height: 24px;
-	padding: 0 8px;
+	height: 26px;
+	padding: 0 10px;
 	font-family: var(--font-interface);
-	font-size: var(--pk-fs-sm);
+	font-size: 10.5px;
 	background: var(--pk-surface2);
 	background-image: none;
 	border: 1px solid var(--pk-line);
-	border-radius: var(--pk-r-sm);
+	border-radius: 7px;
 	box-shadow: none;
 	color: var(--pk-ink);
 	transition: var(--pk-t);
@@ -735,6 +743,14 @@ body.pickme-mark-border .pickme-mark {
 
 .pickme-index-tools .pickme-icon-button {
 	flex: none;
+	width: 26px;
+	height: 26px;
+}
+
+.pickme-index-tools .pickme-index-selmode-toggle {
+	height: 26px;
+	padding: 0 10px;
+	font-size: 10px;
 }
 
 /* 工具条上的「多选」开关：开着就实心强调色，和分段控件的选中态是同一套语言 */
@@ -783,9 +799,9 @@ body.pickme-mark-border .pickme-mark {
 
 /* 组与组之间：一道通栏细线 + 一段呼吸，比行间那层更重 */
 .pickme-index-group + .pickme-index-group {
-	margin-top: 6px;
-	padding-top: 12px;
-	border-top: 1px solid var(--pk-line2);
+	margin-top: 22px;
+	padding-top: 0;
+	border-top: none;
 }
 
 .pickme-index-source {
@@ -793,7 +809,7 @@ body.pickme-mark-border .pickme-mark {
 	align-items: center;
 	gap: 7px;
 	margin: 0;
-	padding: 0 8px 8px;
+	padding: 0 8px 7px;
 	border-bottom: none;
 }
 
@@ -832,20 +848,21 @@ body.pickme-mark-border .pickme-mark {
 	position: relative;
 	display: flex;
 	align-items: center;
-	gap: 9px;
-	padding: 6px 8px;
-	margin: 0;
-	border-left: 2px solid transparent;
+	gap: 10px;
+	padding: 7px 16px;
+	margin: 0 -8px;
+	border-left: none;
 	border-radius: 0;
 	cursor: pointer;
 	transition: var(--pk-t);
+	border-radius: var(--pk-r-sm);
 }
 
 .pickme-index-entry + .pickme-index-entry::before {
 	content: '';
 	position: absolute;
-	left: 11px;
-	right: 11px;
+	left: 80px; /* 从缩略图之后起笔，正文那一列才干净 */
+	right: 16px;
 	top: 0;
 	height: 1px;
 	background: var(--pk-line);
@@ -853,20 +870,18 @@ body.pickme-mark-border .pickme-mark {
 
 .pickme-index-entry:hover {
 	background: var(--pk-surface2);
-	border-left-color: var(--pk-line2);
+	box-shadow: inset 2px 0 0 var(--pk-line2);
 }
 
 .pickme-index-entry.is-picked,
 .pickme-index-entry.is-active {
 	background: var(--pk-acc-soft);
-	border-left-color: var(--pk-acc);
-	border-radius: 0 var(--pk-r-sm) var(--pk-r-sm) 0;
+	box-shadow: inset 2px 0 0 var(--pk-acc);
 }
 
 /* 键盘游标所在的那一行：只加一圈内描边，不抢选中态的强调色底子 */
 .pickme-index-entry.is-cursor {
-	box-shadow: inset 0 0 0 1px var(--pk-acc-line);
-	border-radius: var(--pk-r-sm);
+	box-shadow: inset 0 0 0 1px var(--pk-acc-line), inset 2px 0 0 var(--pk-acc-line);
 }
 
 /* 单条删除：平时藏着，hover / 聚焦 / 选中 / 游标到位时现形；
