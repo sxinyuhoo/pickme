@@ -358,88 +358,141 @@ body.theme-dark {
 	max-width: 46%;
 }
 
-.pickme-hint {
-	color: var(--pk-ink5);
+/* 侧边栏头部：和批注索引完全同一套（同一份代码风格，两个视图看起来才像一家人） */
+.pickme-sidebar .pickme-header {
+	align-items: center;
+	gap: 8px;
+	padding: 0 2px 9px;
+	border-bottom: none;
+}
+
+.pickme-sidebar .pickme-file {
+	font-size: 12.5px;
+	font-weight: 600;
+	letter-spacing: 0.2px;
+}
+
+.pickme-sidebar .pickme-count {
+	font-size: var(--pk-fs-xs);
+	color: color-mix(in srgb, var(--pk-ink) 58%, transparent);
+	font-variant-numeric: tabular-nums;
+}
+
+.pickme-sidebar .pickme-index-link {
+	margin-left: auto;
 	font-size: var(--pk-fs-sm);
-	line-height: 1.5;
-	padding: 7px 0;
-	border-bottom: 1px solid var(--pk-line);
+	color: var(--pk-acc-ink);
+	text-decoration: none;
+}
+
+.pickme-sidebar .pickme-index-link:hover {
+	text-decoration: underline;
+}
+
+/* 说明文字：一条竖线带出引用感，不再用主题的 faint 色（有的主题把它做成青色） */
+.pickme-hint {
+	margin: 2px 0 8px;
+	padding: 0 0 0 8px;
+	border-left: 2px solid var(--pk-line2);
+	color: color-mix(in srgb, var(--pk-ink) 62%, transparent);
+	font-size: var(--pk-fs-sm);
+	line-height: 1.55;
 }
 
 .pickme-empty {
-	color: var(--pk-ink4);
+	color: color-mix(in srgb, var(--pk-ink) 62%, transparent);
 	font-size: var(--pk-fs-sm);
 	line-height: 1.55;
 	padding: 10px 2px;
 }
 
 .pickme-suggest-preview {
-	color: var(--pk-ink4);
+	color: color-mix(in srgb, var(--pk-ink) 62%, transparent);
 	font-size: var(--pk-fs-sm);
 }
 
 /* ---------- 批注卡片（侧边栏） ---------- */
 
+/* 侧边栏的批注行：去掉「卡中卡」，改成和索引一致的「一行 + 左侧强调条」 */
 .pickme-entries {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
-	margin-top: 8px;
+	gap: 0;
+	margin-top: 2px;
 }
 
 .pickme-card {
-	border: 1px solid var(--pk-line);
-	border-radius: var(--pk-r);
-	padding: 6px 8px 7px;
-	background: var(--pk-surface);
+	position: relative;
+	border: none;
+	border-left: 2px solid transparent;
+	border-radius: 0;
+	padding: 8px 8px 10px;
+	background: transparent;
 	transition: var(--pk-t);
 }
 
+.pickme-card + .pickme-card::before {
+	content: '';
+	position: absolute;
+	left: 11px;
+	right: 11px;
+	top: 0;
+	height: 1px;
+	background: var(--pk-line);
+}
+
 .pickme-card:hover {
-	border-color: var(--pk-line2);
+	border-left-color: var(--pk-line2);
+	background: var(--pk-surface2);
 }
 
 .pickme-card.is-active {
-	border-color: var(--pk-acc-line);
+	border-left-color: var(--pk-acc);
+	border-radius: 0 var(--pk-r-sm) var(--pk-r-sm) 0;
 	background: var(--pk-acc-soft);
 }
 
 .pickme-card.is-stale {
-	opacity: 0.75;
-	border-style: dashed;
+	opacity: 0.82;
 }
 
 .pickme-card-head {
 	display: flex;
 	align-items: center;
-	gap: 5px;
+	gap: 6px;
 	cursor: pointer;
 }
 
+/* 锚点 id 就当一个安静的等宽串，别再套胶囊 */
 .pickme-tag {
 	font-family: var(--font-monospace);
-	font-size: var(--pk-fs-xs);
+	font-size: 8.5px;
 	line-height: 1.5;
-	color: var(--pk-ink3);
-	background: var(--pk-surface2);
-	border-radius: var(--pk-pill);
-	padding: 0 6px;
+	color: color-mix(in srgb, var(--pk-ink) 52%, transparent);
+	background: none;
+	border-radius: 0;
+	padding: 0;
 }
 
+/* 类型和索引里一样上标签色 */
 .pickme-kind {
-	font-size: var(--pk-fs-sm);
-	color: var(--pk-ink4);
+	padding: 1px 6px;
+	font-size: 8.5px;
+	line-height: 1.5;
+	color: var(--pk-acc-ink);
+	background: var(--pk-acc-soft);
+	border-radius: var(--pk-pill);
 }
 
 .pickme-status-dot {
-	font-size: var(--pk-fs-xs);
+	font-size: 8.5px;
 	margin-left: auto;
-	color: var(--pk-ink5);
+	color: color-mix(in srgb, var(--pk-ink) 52%, transparent);
 	white-space: nowrap;
 }
 
 .pickme-status-dot.is-ok {
-	color: var(--text-success, var(--color-green));
+	color: color-mix(in srgb, var(--pk-ink) 52%, transparent);
 }
 
 .pickme-status-dot.is-stale {
@@ -448,28 +501,28 @@ body.theme-dark {
 
 /* 引用原文：左边一条荧光色的竖线，底色用面二级 */
 .pickme-selection {
-	margin: 5px 0;
-	padding: 2px 8px;
+	margin: 6px 0 0;
+	padding: 4px 8px;
 	border-left: 2px solid var(--pk-hi);
 	border-radius: 0 var(--pk-r-sm) var(--pk-r-sm) 0;
 	background: var(--pk-surface2);
-	color: var(--pk-ink3);
-	font-size: var(--pk-fs);
-	line-height: 1.55;
+	color: color-mix(in srgb, var(--pk-ink) 82%, transparent);
+	font-size: 10.5px;
+	line-height: 1.5;
 	overflow-wrap: anywhere;
 }
 
 /* 历史问答 */
 .pickme-qa {
-	margin-top: 5px;
-	border-top: 1px dashed var(--pk-line);
-	padding-top: 5px;
+	margin-top: 8px;
+	border-top: 1px solid var(--pk-line);
+	padding-top: 6px;
 }
 
 .pickme-qa summary {
 	cursor: pointer;
 	font-size: var(--pk-fs-sm);
-	color: var(--pk-ink4);
+	color: color-mix(in srgb, var(--pk-ink) 60%, transparent);
 	transition: var(--pk-t);
 }
 
@@ -478,18 +531,21 @@ body.theme-dark {
 }
 
 .pickme-q {
-	margin-top: 4px;
-	font-size: var(--pk-fs);
+	margin-top: 6px;
+	font-size: 10.5px;
 	font-weight: 600;
-	line-height: 1.55;
+	line-height: 1.5;
 	color: var(--pk-ink);
 }
 
+/* 回答用一条细竖线跟问题分开，比纯靠颜色更像「问答」 */
 .pickme-a {
-	margin-top: 4px;
-	font-size: var(--pk-fs);
-	line-height: 1.65;
-	color: var(--pk-ink2);
+	margin-top: 5px;
+	padding-left: 8px;
+	border-left: 2px solid var(--pk-line2);
+	font-size: 10.5px;
+	line-height: 1.6;
+	color: color-mix(in srgb, var(--pk-ink) 78%, transparent);
 	user-select: text;
 }
 
@@ -556,13 +612,53 @@ body.pickme-mark-border .pickme-mark {
 	padding-left: 4px;
 }
 
+/* 侧边栏里的操作按钮：小一号的描边按钮，别抢问答内容的注意力 */
+.pickme-card .pickme-actions {
+	gap: 4px;
+	margin-top: 7px;
+}
+
+.pickme-card .pickme-actions button {
+	height: auto;
+	min-height: 0;
+	padding: 2px 8px;
+	font-size: var(--pk-fs-sm);
+	line-height: 1.5;
+	color: color-mix(in srgb, var(--pk-ink) 72%, transparent);
+	background: transparent;
+	border: 1px solid var(--pk-line2);
+	border-radius: var(--pk-r-sm);
+	box-shadow: none;
+	transition: var(--pk-t);
+}
+
+.pickme-card .pickme-actions button:hover {
+	color: var(--pk-acc-ink);
+	border-color: var(--pk-acc-line);
+	background: transparent;
+}
+
+.pickme-card .pickme-actions button.mod-warning {
+	color: var(--pk-hot);
+	border-color: color-mix(in srgb, var(--pk-hot) 42%, transparent);
+}
+
+.pickme-card .pickme-actions button.mod-warning:hover {
+	background: var(--pk-hot-soft);
+	color: var(--pk-hot);
+}
+
+/* 区域截图：压矮一点，别让一张图把整行撑满 */
 .pickme-thumb {
 	display: block;
+	width: auto;
 	max-width: 100%;
-	max-height: 140px;
-	margin: 5px 0;
+	max-height: 72px;
+	margin: 6px 0 0;
 	border: 1px solid var(--pk-line);
 	border-radius: var(--pk-r-sm);
+	object-fit: cover;
+	object-position: top left;
 	cursor: pointer;
 	transition: var(--pk-t);
 }
@@ -850,17 +946,44 @@ body.pickme-mark-border .pickme-mark {
 }
 
 .pickme-index-what {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	min-width: 0;
+	line-height: 1.4;
+}
+
+.pickme-index-text {
+	flex: 0 1 auto;
+	min-width: 0;
 	font-size: var(--pk-fs);
 	font-weight: 500;
-	line-height: 1.4;
 	color: var(--pk-ink);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-.pickme-index-entry.is-stale .pickme-index-what {
-	color: var(--pk-ink4);
+.pickme-index-page {
+	flex: none;
+	font-size: var(--pk-fs-xs);
+	color: color-mix(in srgb, var(--pk-ink) 64%, transparent);
+	font-variant-numeric: tabular-nums;
+}
+
+/* 类型用标签色，一眼扫得出这条是荧光 / 框选 / 便利贴 */
+.pickme-index-shape {
+	flex: none;
+	padding: 1px 6px;
+	font-size: 8.5px;
+	line-height: 1.5;
+	color: var(--pk-acc-ink);
+	background: var(--pk-acc-soft);
+	border-radius: var(--pk-pill);
+}
+
+.pickme-index-entry.is-stale .pickme-index-text {
+	color: color-mix(in srgb, var(--pk-ink) 55%, transparent);
 	font-weight: 400;
 }
 

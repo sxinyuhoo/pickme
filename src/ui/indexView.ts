@@ -310,11 +310,14 @@ export class PickmeIndexView extends ItemView {
 		}
 
 		const body = row.createDiv({ cls: 'pickme-index-body' });
-		const what =
-			entry.kind === 'pdf' && entry.pdf
-				? t('第 {v0} 页 · {v1}', { v0: entry.pdf.page, v1: shapeWord(entry) })
-				: entry.selection;
-		body.createDiv({ cls: 'pickme-index-what', text: shorten(what, 48) });
+		const what = body.createDiv({ cls: 'pickme-index-what' });
+		if (entry.kind === 'pdf' && entry.pdf) {
+			// 页码淡、类型上色：扫读时先看类型，需要精确定位再看页码
+			what.createSpan({ cls: 'pickme-index-page', text: t('第 {v0} 页', { v0: entry.pdf.page }) });
+			what.createSpan({ cls: 'pickme-index-shape', text: shapeWord(entry) });
+		} else {
+			what.createSpan({ cls: 'pickme-index-text', text: shorten(entry.selection, 48) });
+		}
 		const meta = body.createDiv({ cls: 'pickme-index-meta' });
 		if (stale) meta.createSpan({ cls: 'pickme-index-warn', text: t('失效') });
 		if (entry.qas.length > 0) meta.createSpan({ text: t('{v0} 问', { v0: entry.qas.length }) });
