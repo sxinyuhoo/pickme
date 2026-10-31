@@ -4,6 +4,7 @@ import type PickmePlugin from '../main.ts';
 import type { IndexGroup } from '../store/repository.ts';
 import { shapeKindLabel } from '../core/types.ts';
 import type { AnnotationEntry } from '../core/types.ts';
+import { ConfirmModal } from './confirmModal.ts';
 
 export const VIEW_TYPE_PICKME_INDEX = 'pickme-index-view';
 
@@ -12,6 +13,15 @@ function shapeWord(entry: AnnotationEntry): string {
 	const kind = entry.pdf ? shapeKindLabel(entry.pdf) : '框选';
 	if (kind === '框+线') return t('框+线');
 	return kind === '荧光' ? t('荧光') : t('框选');
+}
+
+/**
+ * 一行对应的批注。行的稳定身份是「源路径 + 锚点 id」，
+ * 文档移动/改名或刷新之后依然点得回同一条，被删掉的自然消失。
+ */
+interface RowRef {
+	group: IndexGroup;
+	entry: AnnotationEntry;
 }
 
 /**
@@ -25,6 +35,21 @@ export class PickmeIndexView extends ItemView {
 	private filter = '';
 	/** 哪些文档的「失效」折叠块被点开过（刷新后仍然记得） */
 	private openedStale = new Set<string>();
+
+	/** 是否处于多选模式：视图根元素挂 pickme-index-selmode，工具条按钮挂 is-active */
+	private selecting = false;
+	/** 已勾选的批注，key = 源路径 + 锚点 id：刷新后仍在，被删掉的自然消失 */
+	private picked = new Set<string>();
+	/** 键盘光标所在的行 key（视觉上给一行 is-cursor 即可） */
+	private cursorKey: string | null = null;
+
+	/** 当前渲染出来的行：key → 行元素，供勾选与键盘就地更新，不用整屏重画 */
+	private rowEls = new Map<string, HTMLElement>();
+	/** 行 key 的显示顺序，供 ↑↓ 在行间移动 */
+	private rowOrder: string[] = [];
+	/** 选择条上要就地更新的两处：已选数字与删除按钮的可用状态 */
+	private selCountEl: HTMLElement | null = null;
+	private selDelBtn: HTMLButtonElement | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: PickmePlugin) {
 		super(leaf);
@@ -49,6 +74,7 @@ export class PickmeIndexView extends ItemView {
 
 	async reload(): Promise<void> {
 		this.groups = await this.plugin.repository.indexData();
+		this.prunePicked();
 		this.render();
 	}
 
@@ -79,11 +105,19 @@ export class PickmeIndexView extends ItemView {
 		return `${group.sourceName} ${entry.id} ${what}`.toLowerCase();
 	}
 
+	/** 行的稳定身份：源路径 + 锚点 id */
+	private pickKey(group: IndexGroup, entry: AnnotationEntry): string {
+		return `${group.sourcePath}::${entry.id}`;
+	}
+
 	private render(): void {
 		const root = this.contentEl;
 		root.empty();
 		root.addClass('pickme-sidebar');
 		root.addClass('pickme-index');
+		root.toggleClass('pickme-index-selmode', this.selecting);
+		// 键盘操作挂在视图根上：行、勾选框上的按键都会冒泡到这里
+		root.onkeydown = (event) => this.onKeyDown(event);
 
 		const { entries, files } = this.totals();
 		const header = root.createDiv({ cls: 'pickme-header' });
@@ -97,7 +131,7 @@ export class PickmeIndexView extends ItemView {
 		const search = tools.createEl('input', {
 			cls: 'pickme-index-filter',
 			type: 'text',
-			placeholder: t('过滤：文档名、选区或锚点 id'),
+			placeholder: t('过滤批注…'),
 		});
 		search.value = this.filter;
 		const refresh = tools.createEl('button', { cls: 'pickme-icon-button' });
@@ -105,6 +139,15 @@ export class PickmeIndexView extends ItemView {
 		refresh.setAttribute('aria-label', t('刷新'));
 		refresh.setAttribute('title', t('刷新'));
 		refresh.onclick = () => void this.reload();
+		// 多选：进/出选择模式的开关，开着的时候按钮自己挂 is-active
+		const multi = tools.createEl('button', { cls: 'pickme-index-selmode-toggle', text: t('多选') });
+		multi.toggleClass('is-active', this.selecting);
+		multi.setAttribute('aria-pressed', this.selecting ? 'true' : 'false');
+		multi.setAttribute('title', t('多选'));
+		multi.onclick = () => this.toggleSelectMode();
+
+		// 选择条就摆在工具条正下方（只有选择模式里才有）
+		this.renderSelBar(root);
 
 		const list = root.createDiv({ cls: 'pickme-index-list' });
 		search.oninput = () => {
@@ -114,8 +157,34 @@ export class PickmeIndexView extends ItemView {
 		this.renderList(list);
 	}
 
+	/** 选择条：已选 N 条 / 全选 / 取消选择 / 删除所选（0 条时删除禁用） */
+	private renderSelBar(root: HTMLElement): void {
+		this.selCountEl = null;
+		this.selDelBtn = null;
+		if (!this.selecting) return;
+		const bar = root.createDiv({ cls: 'pickme-index-selbar' });
+		const status = bar.createSpan({ cls: 'pickme-index-selstatus' });
+		// 「已选 N 条」整句走 i18n，数字单独包一层：占位符当切口，词序不同的语言也不会错位
+		const marker = '\u0000';
+		const [before, after = ''] = t('已选 {v0} 条', { v0: marker }).split(marker);
+		status.appendText(before);
+		this.selCountEl = status.createSpan({ cls: 'pickme-index-selcount', text: String(this.picked.size) });
+		status.appendText(after);
+
+		const all = bar.createEl('button', { cls: 'pickme-index-selall', text: t('全选') });
+		all.onclick = () => this.pickAll();
+		const none = bar.createEl('button', { cls: 'pickme-index-selnone', text: t('取消选择') });
+		none.onclick = () => this.pickNone();
+		const del = bar.createEl('button', { cls: 'pickme-index-del', text: t('删除所选') });
+		del.disabled = this.picked.size === 0;
+		del.onclick = () => this.confirmDeletePicked();
+		this.selDelBtn = del;
+	}
+
 	private renderList(list: HTMLElement): void {
 		list.empty();
+		this.rowEls = new Map();
+		this.rowOrder = [];
 		const groups = this.visible();
 		if (groups.length === 0) {
 			list.createDiv({
@@ -178,23 +247,50 @@ export class PickmeIndexView extends ItemView {
 
 	private renderEntry(parent: HTMLElement, group: IndexGroup, entry: AnnotationEntry): void {
 		const stale = entry.status !== 'ok';
+		const key = this.pickKey(group, entry);
 		const row = parent.createDiv({ cls: stale ? 'pickme-index-entry is-stale' : 'pickme-index-entry' });
-		row.setAttribute('title', t('打开源文档并跳到这条批注'));
+		row.toggleClass('is-picked', this.selecting && this.picked.has(key));
+		row.toggleClass('is-cursor', this.cursorKey === key);
+		if (!this.selecting) row.setAttribute('title', t('打开源文档并跳到这条批注'));
 		// 一条一行，键盘也能开
 		row.setAttribute('tabindex', '0');
 		row.setAttribute('role', 'button');
+		this.rowEls.set(key, row);
+		this.rowOrder.push(key);
+
+		// 选择模式：行最左侧一个勾选框，点它或点整行都切换这一条
+		if (this.selecting) {
+			const check = row.createEl('span', { cls: 'pickme-index-check' });
+			check.setAttribute('role', 'checkbox');
+			check.setAttribute('aria-checked', this.picked.has(key) ? 'true' : 'false');
+			check.setAttribute('tabindex', '-1');
+			setIcon(check, 'check');
+			check.onclick = (event) => {
+				event.stopPropagation();
+				this.togglePick(key);
+			};
+		}
+
 		const open = () => void this.openEntry(group, entry);
-		row.onclick = open;
+		row.onclick = () => {
+			if (this.selecting) this.togglePick(key);
+			else open();
+		};
 		row.onkeydown = (event) => {
+			// 只认落在行本身上面的按键：行里的删除按钮要保留自己的回车/空格行为
+			if (event.target !== row) return;
 			if (event.key === 'Enter' || event.key === ' ') {
 				event.preventDefault();
-				open();
+				if (this.selecting) this.togglePick(key);
+				else open();
 			}
 		};
 
 		// PDF 批注带框选区域的小图，一眼认得出是哪张
 		if (entry.kind === 'pdf' && entry.pdf?.image) {
 			const thumb = row.createEl('img', { cls: 'pickme-index-thumb' });
+			// 截图文件可能已经不在（清理过、或手动删过），加载失败就整块收掉，别留一个浏览器破图标
+			thumb.addEventListener('error', () => thumb.addClass('is-broken'), { once: true });
 			thumb.setAttribute('alt', '');
 			void this.plugin.repository.io.resourceUrl(entry.pdf.image).then((url) => {
 				if (url) thumb.src = url;
@@ -217,7 +313,170 @@ export class PickmeIndexView extends ItemView {
 			body.createDiv({ cls: 'pickme-index-reason', text: t('原文已改动，锚点找不到了') });
 			body.createDiv({ cls: 'pickme-index-reason', text: t('用命令「重新绑定失效锚点」可以把它挂回原文') });
 		}
+
+		// 单条删除入口：与批量删除走同一条确认 + deleteEntry 流程
+		const del = row.createEl('button', { cls: 'pickme-icon-button pickme-index-rowdel' });
+		setIcon(del, 'trash-2');
+		del.setAttribute('aria-label', t('删除'));
+		del.setAttribute('title', t('删除'));
+		del.onclick = (event) => {
+			event.stopPropagation();
+			this.confirmDelete([{ group, entry }]);
+		};
 	}
+
+	// ---------- 多选与批量删除 ----------
+
+	/** 进/出选择模式：退出时清掉勾选与光标（原型就是退出即取消） */
+	private toggleSelectMode(): void {
+		this.selecting = !this.selecting;
+		if (!this.selecting) {
+			this.picked.clear();
+			this.cursorKey = null;
+		}
+		this.render();
+	}
+
+	private exitSelect(): void {
+		this.selecting = false;
+		this.picked.clear();
+		this.cursorKey = null;
+		this.render();
+	}
+
+	/** 切换一条的勾选：就地更新行与选择条，不整屏重画，键盘焦点不丢 */
+	private togglePick(key: string): void {
+		if (this.picked.has(key)) this.picked.delete(key);
+		else this.picked.add(key);
+		const row = this.rowEls.get(key);
+		if (row) {
+			row.toggleClass('is-picked', this.picked.has(key));
+			row.querySelector<HTMLElement>('.pickme-index-check')?.setAttribute(
+				'aria-checked',
+				this.picked.has(key) ? 'true' : 'false',
+			);
+		}
+		this.updateSelBar();
+	}
+
+	private pickAll(): void {
+		this.picked.clear();
+		for (const key of this.rowOrder) this.picked.add(key);
+		for (const [key, row] of this.rowEls) row.toggleClass('is-picked', this.picked.has(key));
+		this.updateSelBar();
+	}
+
+	private pickNone(): void {
+		this.picked.clear();
+		for (const row of this.rowEls.values()) row.removeClass('is-picked');
+		this.updateSelBar();
+	}
+
+	private updateSelBar(): void {
+		if (this.selCountEl) this.selCountEl.setText(String(this.picked.size));
+		if (this.selDelBtn) this.selDelBtn.disabled = this.picked.size === 0;
+	}
+
+	/** 已勾选的行，按数据顺序取全集（过滤只影响显示，不影响「删除所选」的覆盖范围） */
+	private pickedRows(): RowRef[] {
+		const out: RowRef[] = [];
+		if (this.picked.size === 0) return out;
+		for (const group of this.groups) {
+			for (const entry of group.entries) {
+				if (this.picked.has(this.pickKey(group, entry))) out.push({ group, entry });
+			}
+		}
+		return out;
+	}
+
+	/** 刷新数据后把已经不存在的勾选丢掉，已选计数与删除范围才不会对不上 */
+	private prunePicked(): void {
+		if (this.picked.size === 0) return;
+		const alive = new Set<string>();
+		for (const group of this.groups) for (const entry of group.entries) alive.add(this.pickKey(group, entry));
+		for (const key of [...this.picked]) if (!alive.has(key)) this.picked.delete(key);
+	}
+
+	private confirmDeletePicked(): void {
+		this.confirmDelete(this.pickedRows());
+	}
+
+	/** 删除前的确认：把后果说清楚，走的是与单条删除同一条确认 + deleteEntry 流程 */
+	private confirmDelete(rows: RowRef[]): void {
+		if (rows.length === 0) return;
+		new ConfirmModal(
+			this.plugin.app,
+			t('删除 {v0} 条批注？正文里对应的锚点标签会一并移除，原文其它内容不会改动；PDF 批注的区域截图会一起删掉。', {
+				v0: rows.length,
+			}),
+			() => {
+				void this.runDelete(rows);
+			},
+		).open();
+	}
+
+	/** 逐条调用 deleteEntry，删完统一刷新并提示一次，然后退出选择模式 */
+	private async runDelete(rows: RowRef[]): Promise<void> {
+		let removed = 0;
+		for (const { group, entry } of rows) {
+			const file = this.plugin.resolveSourceFile(group.sourcePath);
+			if (!(file instanceof TFile)) continue;
+			await this.plugin.deleteEntry(entry.id, file);
+			removed += 1;
+		}
+		await this.plugin.refreshViews();
+		if (removed > 0) new Notice(t('已删除 {v0} 条批注', { v0: removed }));
+		this.exitSelect();
+	}
+
+	// ---------- 键盘 ----------
+
+	/** 视图根上的键盘：↑↓ 移动、Space 勾选、Mod+A 全选、Delete/Backspace 删除所选的都拦下来 */
+	private onKeyDown(event: KeyboardEvent): void {
+		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+			event.preventDefault();
+			event.stopPropagation();
+			this.moveCursor(event.key === 'ArrowDown' ? 1 : -1);
+			return;
+		}
+		if (!this.selecting) return;
+		if (event.key === ' ' || event.key === 'Spacebar') {
+			if (!this.cursorKey) return;
+			event.preventDefault();
+			event.stopPropagation();
+			this.togglePick(this.cursorKey);
+			return;
+		}
+		if ((event.metaKey || event.ctrlKey) && (event.key === 'a' || event.key === 'A')) {
+			event.preventDefault();
+			event.stopPropagation();
+			this.pickAll();
+			return;
+		}
+		if (event.key === 'Delete' || event.key === 'Backspace') {
+			if (this.picked.size === 0) return;
+			event.preventDefault();
+			event.stopPropagation();
+			this.confirmDeletePicked();
+		}
+	}
+
+	private moveCursor(delta: number): void {
+		if (this.rowOrder.length === 0) return;
+		const at = this.cursorKey ? this.rowOrder.indexOf(this.cursorKey) : -1;
+		const start = at === -1 ? (delta > 0 ? 0 : this.rowOrder.length - 1) : at + delta;
+		const next = Math.max(0, Math.min(this.rowOrder.length - 1, start));
+		const key = this.rowOrder[next];
+		if (this.cursorKey && this.cursorKey !== key) this.rowEls.get(this.cursorKey)?.removeClass('is-cursor');
+		this.cursorKey = key;
+		const row = this.rowEls.get(key);
+		if (row) {
+			row.addClass('is-cursor');
+			row.scrollIntoView({ block: 'nearest' });
+		}
+	}
+
+	// ---------- 跳转 ----------
 
 	private async openSource(group: IndexGroup): Promise<void> {
 		const file = this.plugin.resolveSourceFile(group.sourcePath);

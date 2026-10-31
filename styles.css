@@ -1,8 +1,257 @@
-/* pickme 插件样式 */
+/* ==========================================================
+   pickme · 样式（V2「TLT 密度版」）
+
+   设计语言的出处是同一作者的 TLT 插件：五级文字灰阶（ink1-5）、
+   线/面三级、一个强调色、一个软危险色、统一 .14s ease 过渡、
+   7px/5px 圆角 + 999px 胶囊。这里只把令牌换成 --pk-* 前缀。
+
+   颜色优先映射到 Obsidian 语义变量（换主题自动跟随），
+   只有强调色 / 软危险色 / 荧光色用固定值。
+   深浅两套在 body.theme-light / body.theme-dark 上分开写。
+   ========================================================== */
+
+body {
+	/* ---------- 面：三级 ---------- */
+	--pk-bg: var(--background-primary);
+	--pk-bg2: var(--background-secondary);
+	--pk-surface: var(--background-primary);
+	--pk-surface2: var(--background-secondary);
+	--pk-surface3: var(--background-modifier-hover);
+
+	/* ---------- 线：两级 ---------- */
+	--pk-line: var(--background-modifier-border);
+	--pk-line2: var(--background-modifier-border-hover, var(--background-modifier-border));
+
+	/* ---------- 字：五级灰阶 ---------- */
+	--pk-ink: var(--text-normal);
+	--pk-ink2: var(--text-normal);
+	--pk-ink3: var(--text-muted);
+	--pk-ink4: var(--text-muted);
+	--pk-ink5: var(--text-faint);
+
+	/* ---------- 强调 / 危险 / 荧光（固定值） ---------- */
+	--pk-acc: #5b6cff;
+	--pk-acc-ink: #3b49d6;
+	--pk-acc-soft: rgba(91, 108, 255, 0.12);
+	--pk-acc-line: rgba(91, 108, 255, 0.42);
+	--pk-hot: #d96a6a;
+	--pk-hot-soft: rgba(217, 106, 106, 0.11);
+
+	/* 荧光色跟着设置走（main.ts 会把设置写进 body 的内联样式） */
+	--pickme-highlight: #f2c14e;
+	--pk-hi: var(--pickme-highlight, #f2c14e);
+
+	/* PDF 纸面：纸永远是白的，深色主题下也是一张白纸 */
+	--pk-paper: #ffffff;
+
+	/* ---------- 尺寸 ---------- */
+	--pk-r: 7px;
+	--pk-r-sm: 5px;
+	--pk-r-lg: 10px;
+	--pk-pill: 999px;
+
+	/* 密度（对齐 TLT）：正文/行标题 11-12，元信息 9-9.5，控件 9.5-10.5 */
+	--pk-fs: 11.5px;
+	--pk-fs-title: 12px;
+	--pk-fs-ctl: 10px;
+	--pk-fs-sm: 9.5px;
+	--pk-fs-xs: 9px;
+
+	/* 所有交互共用一条过渡，别各自写各的时长 */
+	--pk-t: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease,
+		box-shadow 0.14s ease;
+}
+
+/* 浅色：面/线/字全靠语义变量，这里只钉住强调色的深色落款 */
+body.theme-light {
+	--pk-acc-ink: #3b49d6;
+	--pk-acc-soft: rgba(91, 108, 255, 0.12);
+	--pk-acc-line: rgba(91, 108, 255, 0.42);
+	--pk-hot: #d96a6a;
+	--pk-hot-soft: rgba(217, 106, 106, 0.1);
+	--pk-paper: #ffffff;
+}
+
+/* 深色：强调文字反白，软底子略提亮（暗底上的 10% 太看不见） */
+body.theme-dark {
+	--pk-acc-ink: #e7e9ff;
+	--pk-acc-soft: rgba(91, 108, 255, 0.16);
+	--pk-acc-line: rgba(91, 108, 255, 0.45);
+	--pk-hot: #d96a6a;
+	--pk-hot-soft: rgba(217, 106, 106, 0.14);
+	--pk-paper: #ffffff;
+}
+
+/* ---------- 基座：字体、行高、盒模型都收在 pickme 自己的容器里 ---------- */
+
+.pickme-sidebar,
+.pickme-index,
+.pickme-pdf,
+.pickme-panel,
+.pickme-template-list {
+	font-family: var(--font-interface);
+	font-size: var(--pk-fs);
+	line-height: 1.5;
+	color: var(--pk-ink);
+	-webkit-font-smoothing: antialiased;
+}
+
+.pickme-sidebar *,
+.pickme-index *,
+.pickme-pdf *,
+.pickme-panel *,
+.pickme-template-list * {
+	box-sizing: border-box;
+}
+
+/* 细一点的滚动条，跟 TLT 一致 */
+.pickme-sidebar::-webkit-scrollbar,
+.pickme-pdf-scroll::-webkit-scrollbar,
+.pickme-pdf-toc::-webkit-scrollbar,
+.pickme-panel::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+.pickme-sidebar::-webkit-scrollbar-thumb,
+.pickme-pdf-scroll::-webkit-scrollbar-thumb,
+.pickme-pdf-toc::-webkit-scrollbar-thumb,
+.pickme-panel::-webkit-scrollbar-thumb {
+	background: var(--pk-line2);
+	border-radius: 4px;
+}
+
+.pickme-sidebar::-webkit-scrollbar-thumb:hover,
+.pickme-pdf-scroll::-webkit-scrollbar-thumb:hover,
+.pickme-pdf-toc::-webkit-scrollbar-thumb:hover,
+.pickme-panel::-webkit-scrollbar-thumb:hover {
+	background: var(--pk-ink5);
+}
+
+.pickme-sidebar::-webkit-scrollbar-track,
+.pickme-pdf-scroll::-webkit-scrollbar-track,
+.pickme-pdf-toc::-webkit-scrollbar-track,
+.pickme-panel::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+/* ---------- 通用按钮：V2 的小字胶囊方角按钮 ----------
+   :where() 把优先级归零，具体类（图标按钮、关闭按钮）照常覆盖。
+   主题会给 button 套自己的底色，这里统一按令牌压回去。 */
+
+:where(.pickme-sidebar, .pickme-panel, .pickme-index, .pickme-pdf, .pickme-confirm-actions, .pickme-template-list)
+	button {
+	font-family: var(--font-interface);
+	font-size: var(--pk-fs-ctl);
+	line-height: 1.5;
+	height: auto;
+	min-height: 0;
+	padding: 2px 8px;
+	border: 1px solid var(--pk-line2);
+	border-radius: var(--pk-r-sm);
+	background: transparent;
+	background-image: none;
+	box-shadow: none;
+	color: var(--pk-ink3);
+	cursor: pointer;
+	transition: var(--pk-t);
+}
+
+:where(.pickme-sidebar, .pickme-panel, .pickme-index, .pickme-pdf, .pickme-confirm-actions, .pickme-template-list)
+	button:hover {
+	border-color: var(--pk-acc-line);
+	background: transparent;
+	box-shadow: none;
+	color: var(--pk-ink);
+}
+
+:where(.pickme-sidebar, .pickme-panel, .pickme-index, .pickme-pdf, .pickme-confirm-actions, .pickme-template-list)
+	button:active {
+	box-shadow: none;
+	transform: none;
+}
+
+/* 主按钮：实心强调色 */
+.pickme-composer button.mod-cta,
+.pickme-actions button.mod-cta,
+.pickme-note button.mod-cta {
+	background: var(--pk-acc);
+	border-color: var(--pk-acc);
+	color: #fff;
+}
+
+.pickme-composer button.mod-cta:hover,
+.pickme-actions button.mod-cta:hover,
+.pickme-note button.mod-cta:hover {
+	background: var(--pk-acc);
+	border-color: var(--pk-acc);
+	color: #fff;
+	filter: brightness(1.07);
+}
+
+/* 危险按钮：软底子 + 危险色 */
+.pickme-actions button.mod-warning,
+.pickme-confirm-actions button.mod-warning {
+	background: var(--pk-hot-soft);
+	border-color: color-mix(in srgb, var(--pk-hot) 36%, transparent);
+	color: var(--pk-hot);
+}
+
+.pickme-actions button.mod-warning:hover,
+.pickme-confirm-actions button.mod-warning:hover {
+	background: color-mix(in srgb, var(--pk-hot) 18%, transparent);
+	border-color: color-mix(in srgb, var(--pk-hot) 55%, transparent);
+	color: var(--pk-hot);
+	filter: none;
+}
+
+/* ---------- 输入框：统一面 + 细线 ---------- */
+
+.pickme-sidebar input[type="text"]:not(.pickme-index-filter),
+.pickme-panel input[type="text"],
+.pickme-sidebar select,
+.pickme-panel select,
+.pickme-question,
+.pickme-note-input,
+.pickme-pdf-page {
+	font-family: var(--font-interface);
+	font-size: var(--pk-fs);
+	background: var(--pk-surface2);
+	background-image: none;
+	border: 1px solid var(--pk-line);
+	border-radius: var(--pk-r-sm);
+	box-shadow: none;
+	color: var(--pk-ink);
+	transition: var(--pk-t);
+}
+
+.pickme-sidebar select,
+.pickme-panel select {
+	font-size: var(--pk-fs-sm);
+	padding: 2px 6px;
+	color: var(--pk-ink3);
+}
+
+.pickme-question:focus,
+.pickme-note-input:focus,
+.pickme-pdf-page:focus,
+.pickme-sidebar select:focus,
+.pickme-panel select:focus {
+	border-color: var(--pk-acc-line);
+	box-shadow: none;
+	outline: none;
+}
+
+.pickme-question::placeholder,
+.pickme-note-input::placeholder {
+	color: var(--pk-ink5);
+}
+
+/* ---------- 侧边栏骨架 ---------- */
 
 .pickme-sidebar {
 	--pickme-highlight: #f2c14e;
-	padding: 8px 10px 40px;
+	padding: 10px 10px 40px;
 }
 
 .pickme-header {
@@ -10,12 +259,14 @@
 	justify-content: space-between;
 	align-items: baseline;
 	gap: 8px;
-	padding-bottom: 6px;
-	border-bottom: 1px solid var(--background-modifier-border);
+	padding-bottom: 5px;
+	border-bottom: 1px solid var(--pk-line);
 }
 
 .pickme-file {
+	font-size: var(--pk-fs-title);
 	font-weight: 600;
+	letter-spacing: 0.1px;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -24,26 +275,898 @@
 .pickme-count,
 .pickme-meta,
 .pickme-status {
-	color: var(--text-muted);
-	font-size: var(--font-ui-smaller);
+	color: var(--pk-ink4);
+	font-size: var(--pk-fs-sm);
+	white-space: nowrap;
+}
+
+.pickme-status {
+	white-space: normal;
+	line-height: 1.45;
 }
 
 .pickme-composer {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
-	padding: 8px 0;
-	border-bottom: 1px solid var(--background-modifier-border);
+	gap: 5px;
+	padding: 7px 0;
+	border-bottom: 1px solid var(--pk-line);
 }
 
 .pickme-row {
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	gap: 5px;
 	flex-wrap: wrap;
 }
 
+.pickme-actions {
+	margin-top: 3px;
+	gap: 4px;
+}
+
+.pickme-question {
+	width: 100%;
+	resize: vertical;
+	font-size: var(--pk-fs);
+	line-height: 1.55;
+	padding: 5px 7px;
+	min-height: 52px;
+}
+
 /* 确认弹窗里的动作行：确认/取消摆到右下角 */
+.pickme-confirm-actions {
+	justify-content: flex-end;
+	margin-top: 14px;
+	gap: 7px;
+}
+
+.pickme-confirm-actions button {
+	font-size: var(--pk-fs-ctl);
+	padding: 3px 10px;
+	border-radius: var(--pk-r-sm);
+}
+
+/* 勾选框：颜色跟着强调色，尺寸交给主题，别去改它的几何 */
+.pickme-checkbox {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--pk-ink4);
+	font-size: var(--pk-fs-sm);
+	cursor: pointer;
+}
+
+.pickme-checkbox input[type="checkbox"] {
+	accent-color: var(--pk-acc);
+	cursor: pointer;
+	margin: 0;
+}
+
+.pickme-model {
+	max-width: 46%;
+}
+
+.pickme-hint {
+	color: var(--pk-ink5);
+	font-size: var(--pk-fs-sm);
+	line-height: 1.5;
+	padding: 7px 0;
+	border-bottom: 1px solid var(--pk-line);
+}
+
+.pickme-empty {
+	color: var(--pk-ink4);
+	font-size: var(--pk-fs-sm);
+	line-height: 1.55;
+	padding: 10px 2px;
+}
+
+.pickme-suggest-preview {
+	color: var(--pk-ink4);
+	font-size: var(--pk-fs-sm);
+}
+
+/* ---------- 批注卡片（侧边栏） ---------- */
+
+.pickme-entries {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-top: 8px;
+}
+
+.pickme-card {
+	border: 1px solid var(--pk-line);
+	border-radius: var(--pk-r);
+	padding: 6px 8px 7px;
+	background: var(--pk-surface);
+	transition: var(--pk-t);
+}
+
+.pickme-card:hover {
+	border-color: var(--pk-line2);
+}
+
+.pickme-card.is-active {
+	border-color: var(--pk-acc-line);
+	background: var(--pk-acc-soft);
+}
+
+.pickme-card.is-stale {
+	opacity: 0.75;
+	border-style: dashed;
+}
+
+.pickme-card-head {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	cursor: pointer;
+}
+
+.pickme-tag {
+	font-family: var(--font-monospace);
+	font-size: var(--pk-fs-xs);
+	line-height: 1.5;
+	color: var(--pk-ink3);
+	background: var(--pk-surface2);
+	border-radius: var(--pk-pill);
+	padding: 0 6px;
+}
+
+.pickme-kind {
+	font-size: var(--pk-fs-sm);
+	color: var(--pk-ink4);
+}
+
+.pickme-status-dot {
+	font-size: var(--pk-fs-xs);
+	margin-left: auto;
+	color: var(--pk-ink5);
+	white-space: nowrap;
+}
+
+.pickme-status-dot.is-ok {
+	color: var(--text-success, var(--color-green));
+}
+
+.pickme-status-dot.is-stale {
+	color: var(--pk-hot);
+}
+
+/* 引用原文：左边一条荧光色的竖线，底色用面二级 */
+.pickme-selection {
+	margin: 5px 0;
+	padding: 2px 8px;
+	border-left: 2px solid var(--pk-hi);
+	border-radius: 0 var(--pk-r-sm) var(--pk-r-sm) 0;
+	background: var(--pk-surface2);
+	color: var(--pk-ink3);
+	font-size: var(--pk-fs);
+	line-height: 1.55;
+	overflow-wrap: anywhere;
+}
+
+/* 历史问答 */
+.pickme-qa {
+	margin-top: 5px;
+	border-top: 1px dashed var(--pk-line);
+	padding-top: 5px;
+}
+
+.pickme-qa summary {
+	cursor: pointer;
+	font-size: var(--pk-fs-sm);
+	color: var(--pk-ink4);
+	transition: var(--pk-t);
+}
+
+.pickme-qa summary:hover {
+	color: var(--pk-ink);
+}
+
+.pickme-q {
+	margin-top: 4px;
+	font-size: var(--pk-fs);
+	font-weight: 600;
+	line-height: 1.55;
+	color: var(--pk-ink);
+}
+
+.pickme-a {
+	margin-top: 4px;
+	font-size: var(--pk-fs);
+	line-height: 1.65;
+	color: var(--pk-ink2);
+	user-select: text;
+}
+
+/* 荧光笔的备注文字 */
+.pickme-note {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+}
+
+.pickme-note-input {
+	width: 100%;
+	min-height: 54px;
+	resize: vertical;
+	font-family: inherit;
+	font-size: var(--pk-fs);
+	line-height: 1.55;
+	padding: 5px 7px;
+}
+
+.pickme-note-text {
+	margin-top: 2px;
+	color: var(--pk-ink4);
+	font-size: var(--pk-fs-sm);
+	line-height: 1.5;
+	font-style: italic;
+}
+
+.pickme-note-remove {
+	color: var(--pk-hot);
+}
+
+/* ---------- 原文里的批注标记 ---------- */
+
+.pickme-mark {
+	border-radius: 2px;
+	cursor: pointer;
+	transition: background-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.pickme-mark:hover {
+	background: color-mix(in srgb, var(--pk-hi) 55%, transparent);
+}
+
+.pickme-anchor-widget {
+	display: none;
+}
+
+/* 三种标记样式（body 上的类由设置决定） */
+body.pickme-mark-background .pickme-mark {
+	background: color-mix(in srgb, var(--pk-hi) 35%, transparent);
+}
+
+body.pickme-mark-underline .pickme-mark {
+	background: transparent;
+	border-bottom: 2px solid var(--pk-hi);
+	border-radius: 0;
+}
+
+body.pickme-mark-border .pickme-mark {
+	background: transparent;
+	border-left: 3px solid var(--pk-hi);
+	border-radius: 0;
+	padding-left: 4px;
+}
+
+.pickme-thumb {
+	display: block;
+	max-width: 100%;
+	max-height: 140px;
+	margin: 5px 0;
+	border: 1px solid var(--pk-line);
+	border-radius: var(--pk-r-sm);
+	cursor: pointer;
+	transition: var(--pk-t);
+}
+
+.pickme-thumb:hover {
+	border-color: var(--pk-acc-line);
+}
+
+/* ==========================================================
+   批注索引
+   ========================================================== */
+
+/* 索引视图自己管内边距，别和主题的 view-content 叠加成两层 */
+.workspace-leaf-content[data-type="pickme-index-view"] .view-content {
+	padding: 0;
+	overflow: hidden;
+}
+
+.pickme-index {
+	padding-top: 8px;
+}
+
+.pickme-index-tools {
+	gap: 6px;
+	margin: 8px 0 8px;
+	flex-wrap: nowrap;
+}
+
+.pickme-index-filter {
+	flex: 1;
+	min-width: 0;
+	font-family: var(--font-interface);
+	font-size: var(--pk-fs);
+	height: auto;
+	padding: 3px 8px;
+	background: var(--pk-surface2);
+	background-image: none;
+	border: 1px solid var(--pk-line);
+	border-radius: var(--pk-r-sm);
+	box-shadow: none;
+	color: var(--pk-ink);
+	transition: var(--pk-t);
+}
+
+.pickme-index-filter:focus {
+	border-color: var(--pk-acc-line);
+	box-shadow: none;
+	outline: none;
+}
+
+.pickme-index-filter::placeholder {
+	color: var(--pk-ink5);
+}
+
+.pickme-index-tools .pickme-icon-button {
+	flex: none;
+}
+
+/* 工具条上的「多选」开关：开着就实心强调色，和分段控件的选中态是同一套语言 */
+.pickme-index-selmode-toggle.is-active {
+	background: var(--pk-acc);
+	border-color: var(--pk-acc);
+	color: #fff;
+}
+
+.pickme-index-selmode-toggle.is-active:hover {
+	background: var(--pk-acc);
+	border-color: var(--pk-acc);
+	color: #fff;
+	filter: brightness(1.07);
+}
+
+.pickme-index-link {
+	margin-left: auto;
+	font-size: var(--pk-fs-sm);
+	color: var(--pk-ink4);
+	cursor: pointer;
+	transition: var(--pk-t);
+}
+
+.pickme-index-link:hover {
+	color: var(--pk-acc-ink);
+}
+
+.pickme-index-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+/* 索引里的「文档」分组：不是一张卡，是一段带小标题的列表 */
+.pickme-card.pickme-index-group {
+	border: none;
+	border-radius: 0;
+	padding: 0;
+	background: transparent;
+}
+
+.pickme-card.pickme-index-group:hover {
+	border-color: transparent;
+}
+
+.pickme-index-source {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	margin: 0;
+	padding: 5px 8px 3px;
+	border-bottom: 1px solid var(--pk-line);
+}
+
+.pickme-index-name {
+	font-size: var(--pk-fs-sm);
+	font-weight: 600;
+	color: var(--pk-ink3);
+	cursor: pointer;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	transition: var(--pk-t);
+}
+
+.pickme-index-name:hover {
+	color: var(--pk-acc-ink);
+}
+
+.pickme-index-source .pickme-count {
+	margin-left: auto;
+	font-size: var(--pk-fs-xs);
+	color: var(--pk-ink5);
+}
+
+/* 一行一条批注：左侧 2px 的选中条，hover 只抬一档底色 */
+.pickme-index-entry {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	padding: 4.5px 8px;
+	margin: 0;
+	border-left: 2px solid transparent;
+	border-radius: 0 var(--pk-r-sm) var(--pk-r-sm) 0;
+	cursor: pointer;
+	transition: var(--pk-t);
+}
+
+.pickme-index-entry:hover {
+	background: var(--pk-surface2);
+	border-left-color: var(--pk-line2);
+}
+
+.pickme-index-entry.is-picked,
+.pickme-index-entry.is-active {
+	background: var(--pk-acc-soft);
+	border-left-color: var(--pk-acc);
+}
+
+/* 键盘游标所在的那一行：只加一圈内描边，不抢选中态的强调色底子 */
+.pickme-index-entry.is-cursor {
+	box-shadow: inset 0 0 0 1px var(--pk-acc-line);
+}
+
+/* 单条删除：平时藏着，hover / 聚焦 / 选中 / 游标到位时现形；
+   触屏没有 hover，就常驻显示，别让删除入口在平板和手机上没有着落 */
+.pickme-index-rowdel {
+	flex: none;
+	align-self: center;
+	margin-left: auto;
+	opacity: 0;
+	color: var(--pk-ink5);
+	transition: var(--pk-t);
+}
+
+.pickme-index-entry:hover .pickme-index-rowdel,
+.pickme-index-entry:focus-within .pickme-index-rowdel,
+.pickme-index-entry.is-picked .pickme-index-rowdel,
+.pickme-index-entry.is-cursor .pickme-index-rowdel,
+.pickme-index-rowdel:focus-visible {
+	opacity: 1;
+}
+
+.pickme-index-rowdel:hover {
+	background: var(--pk-hot-soft);
+	border-color: transparent;
+	color: var(--pk-hot);
+}
+
+@media (hover: none) {
+	.pickme-index-rowdel {
+		opacity: 1;
+	}
+}
+
+.pickme-index-entry:focus-visible,
+.pickme-index-name:focus-visible {
+	outline: 2px solid var(--pk-acc);
+	outline-offset: -2px;
+	border-radius: var(--pk-r-sm);
+}
+
+.pickme-index-body {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+/* PDF 批注的框选小图：固定框 + cover，宽扁的区域截图也不会把行压成一条缝 */
+.pickme-index-thumb {
+	flex: 0 0 auto;
+	width: 52px;
+	height: 36px;
+	object-fit: cover;
+	border: 1px solid var(--pk-line);
+	border-radius: var(--pk-r-sm);
+	background: var(--pk-surface2);
+}
+
+.pickme-index-what {
+	font-size: var(--pk-fs);
+	line-height: 1.45;
+	color: var(--pk-ink);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.pickme-index-entry.is-stale .pickme-index-what {
+	color: var(--pk-ink4);
+}
+
+.pickme-index-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 1px;
+	color: var(--pk-ink3);
+	font-size: var(--pk-fs-xs);
+	line-height: 1.4;
+}
+
+.pickme-index-meta code,
+.pickme-index-meta .pickme-tag {
+	font-family: var(--font-monospace);
+	font-size: var(--pk-fs-xs);
+	color: var(--pk-ink3);
+	background: var(--pk-surface2);
+	border-radius: 3px;
+	padding: 0 3px;
+}
+
+.pickme-index-ok {
+	color: var(--text-success, var(--color-green));
+}
+
+.pickme-index-warn {
+	color: var(--pk-hot);
+	background: var(--pk-hot-soft);
+	border-radius: var(--pk-pill);
+	padding: 0 5px;
+	font-size: var(--pk-fs-xs);
+}
+
+/* 失效批注默认折起来，展开才逐条列出 */
+.pickme-index-stale-toggle {
+	margin: 3px 4px 2px;
+	padding: 3px 6px;
+	border-radius: var(--pk-r-sm);
+	color: var(--pk-ink4);
+	cursor: pointer;
+	font-size: var(--pk-fs-xs);
+	user-select: none;
+	transition: var(--pk-t);
+}
+
+.pickme-index-stale-toggle:hover {
+	background: var(--pk-surface2);
+	color: var(--pk-ink);
+}
+
+.pickme-index-stale-toggle:focus-visible {
+	outline: 2px solid var(--pk-acc);
+	outline-offset: -2px;
+}
+
+.pickme-index-entry.is-stale {
+	opacity: 0.7;
+}
+
+.pickme-index-entry.is-stale:hover {
+	opacity: 1;
+}
+
+.pickme-index-reason {
+	margin-top: 1px;
+	color: var(--pk-ink4);
+	font-size: var(--pk-fs-xs);
+	line-height: 1.4;
+}
+
+/* ---------- 索引 · 多选（DOM 由另一路补齐，这里先把观感定下来） ---------- */
+
+/* 选择模式：勾选框从 hover 才现形变成常驻 */
+.pickme-index-selmode .pickme-index-check {
+	opacity: 1;
+}
+
+/* 勾选框：13px 方块，只在行的左侧，平时藏着免得列表显脏 */
+.pickme-index-check {
+	display: grid;
+	place-items: center;
+	flex: 0 0 13px;
+	width: 13px;
+	height: 13px;
+	margin-top: 2px;
+	border: 1.5px solid var(--pk-line2);
+	border-radius: 4px;
+	background: transparent;
+	cursor: pointer;
+	opacity: 0;
+	transition: var(--pk-t);
+}
+
+.pickme-index-check:hover {
+	border-color: var(--pk-acc-line);
+}
+
+.pickme-index-check svg {
+	width: 9px;
+	height: 9px;
+	opacity: 0;
+	color: #fff;
+	transition: var(--pk-t);
+}
+
+.pickme-index-entry:hover .pickme-index-check,
+.pickme-index-entry.is-picked .pickme-index-check {
+	opacity: 1;
+}
+
+.pickme-index-entry.is-picked .pickme-index-check,
+.pickme-index-check.is-active {
+	background: var(--pk-acc);
+	border-color: var(--pk-acc);
+}
+
+.pickme-index-entry.is-picked .pickme-index-check svg,
+.pickme-index-check.is-active svg {
+	opacity: 1;
+}
+
+/* 行被选中：行内图标也抬一档，跟空格子区分开 */
+.pickme-index-entry.is-picked .pickme-index-thumb {
+	border-color: var(--pk-acc-line);
+}
+
+/* 选择条：贴在工具条下面，强调色软底子 */
+.pickme-index-selbar {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0 0 6px;
+	padding: 5px 8px;
+	background: var(--pk-acc-soft);
+	border-bottom: 1px solid var(--pk-acc-line);
+	font-size: var(--pk-fs-ctl);
+	color: var(--pk-acc-ink);
+}
+
+.pickme-index-selbar[hidden],
+.pickme-index-selbar.is-hidden,
+.pickme-index-selbar.is-off {
+	display: none;
+}
+
+.pickme-index-selcount {
+	font-size: var(--pk-fs-ctl);
+	color: var(--pk-acc-ink);
+	font-variant-numeric: tabular-nums;
+}
+
+.pickme-index-selstatus {
+	font-size: var(--pk-fs-ctl);
+	color: var(--pk-acc-ink);
+	white-space: nowrap;
+}
+
+.pickme-index-selcount b,
+.pickme-index-selbar b {
+	font-weight: 600;
+}
+
+/* 选择条上的按钮：边框和字都用强调色，删除用危险色，删除靠右 */
+.pickme-index-selall,
+.pickme-index-selnone,
+.pickme-index-del {
+	font-family: var(--font-interface);
+	font-size: var(--pk-fs-ctl);
+	padding: 2px 8px;
+	border: 1px solid var(--pk-acc-line);
+	border-radius: var(--pk-r-sm);
+	background: transparent;
+	box-shadow: none;
+	color: var(--pk-acc-ink);
+	cursor: pointer;
+	transition: var(--pk-t);
+}
+
+.pickme-index-selall:hover,
+.pickme-index-selnone:hover {
+	background: color-mix(in srgb, var(--pk-acc) 18%, transparent);
+	border-color: var(--pk-acc);
+	color: var(--pk-acc-ink);
+}
+
+.pickme-index-del {
+	margin-left: auto;
+	color: var(--pk-hot);
+	border-color: color-mix(in srgb, var(--pk-hot) 36%, transparent);
+}
+
+.pickme-index-del:hover {
+	background: var(--pk-hot-soft);
+	border-color: color-mix(in srgb, var(--pk-hot) 55%, transparent);
+	color: var(--pk-hot);
+}
+
+.pickme-index-selall[disabled],
+.pickme-index-selnone[disabled],
+.pickme-index-del[disabled] {
+	opacity: 0.42;
+	cursor: not-allowed;
+}
+
+.pickme-index-del[disabled] {
+	color: var(--pk-ink4);
+	border-color: var(--pk-line2);
+}
+
+.pickme-index-del[disabled]:hover {
+	background: transparent;
+}
+
+/* ==========================================================
+   PDF 查看器
+   ========================================================== */
+
+.workspace-leaf-content[data-type="pickme-pdf-view"] .view-content {
+	padding: 0;
+	overflow: hidden;
+}
+
+.pickme-pdf {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	padding: 0;
+	background: var(--pk-bg);
+}
+
+/* 工具栏按功能分段：目录 ｜ 翻页 ｜ 缩放 ｜ 显示，段之间一条细线，状态提示靠最右 */
+.pickme-pdf-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 5px 8px;
+	background: var(--pk-bg2);
+	border-bottom: 1px solid var(--pk-line);
+	flex-wrap: wrap;
+}
+
+/* 段与段之间的细线 */
+.pickme-pdf-sep {
+	width: 1px;
+	height: 14px;
+	margin: 0 3px;
+	background: var(--pk-line2);
+}
+
+/* 图标按钮：工具栏上不放文字，悬停才给提示 */
+.pickme-icon-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	min-height: 0;
+	padding: 0;
+	border: none;
+	border-radius: var(--pk-r-sm);
+	background: transparent;
+	background-image: none;
+	box-shadow: none;
+	color: var(--pk-ink4);
+	cursor: pointer;
+	transition: var(--pk-t);
+}
+
+.pickme-icon-button:hover {
+	background: var(--pk-surface3);
+	border-color: transparent;
+	color: var(--pk-ink);
+	box-shadow: none;
+}
+
+.pickme-icon-button svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* 开着（目录展开 / 高亮开着）用强调色的软底子，关掉用更浅的灰 */
+.pickme-icon-button.is-active {
+	color: var(--pk-acc-ink);
+	background: var(--pk-acc-soft);
+	box-shadow: inset 0 0 0 1px var(--pk-acc-line);
+}
+
+.pickme-icon-button.is-active:hover {
+	background: color-mix(in srgb, var(--pk-acc) 22%, transparent);
+}
+
+.pickme-icon-button.is-off {
+	color: var(--pk-ink5);
+}
+
+.pickme-icon-button.is-off:hover {
+	color: var(--pk-ink4);
+}
+
+.pickme-icon-button.is-hidden {
+	display: none;
+}
+
+/* 当前选中的标注方式：底色 + 描边都上强调色，别只靠图标深浅 */
+.pickme-pdf-mode.is-active {
+	background: var(--pk-acc-soft);
+	color: var(--pk-acc-ink);
+	box-shadow: inset 0 0 0 1px var(--pk-acc-line);
+}
+
+.pickme-pdf-mode.is-active:hover {
+	background: color-mix(in srgb, var(--pk-acc) 22%, transparent);
+	color: var(--pk-acc-ink);
+}
+
+.pickme-pdf-page {
+	width: 38px;
+	height: 20px;
+	text-align: center;
+	padding: 0 2px;
+	font-size: var(--pk-fs-ctl);
+	font-variant-numeric: tabular-nums;
+	margin: 0 1px;
+}
+
+.pickme-pdf-total {
+	color: var(--pk-ink5);
+	font-size: var(--pk-fs-sm);
+	margin: 0 4px 0 2px;
+	white-space: nowrap;
+}
+
+/* 缩放百分比：兼作「回到 100%」按钮 */
+.pickme-pdf-zoom {
+	min-width: 44px;
+	padding: 2px 6px;
+	border: none;
+	border-radius: var(--pk-r-sm);
+	background: transparent;
+	background-image: none;
+	box-shadow: none;
+	color: var(--pk-ink4);
+	font-size: var(--pk-fs-ctl);
+	font-variant-numeric: tabular-nums;
+	cursor: pointer;
+	transition: var(--pk-t);
+}
+
+.pickme-pdf-zoom:hover {
+	background: var(--pk-surface3);
+	color: var(--pk-ink);
+}
+
+/* 状态提示：吃掉剩下的空间，窄了就省略号，绝不把工具栏挤成两行 */
+.pickme-pdf-status {
+	margin-left: auto;
+	flex: 1 1 40px;
+	min-width: 0;
+	color: var(--pk-ink5);
+	font-size: var(--pk-fs-sm);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.pickme-status-retry {
+	margin-left: 6px;
+	padding: 0 6px;
+	font-size: var(--pk-fs-xs);
+	line-height: 1.6;
+	border: 1px solid var(--pk-acc-line);
+	border-radius: var(--pk-pill);
+	background: transparent;
+	box-shadow: none;
+	color: var(--pk-acc-ink);
+	cursor: pointer;
+	vertical-align: baseline;
+	transition: var(--pk-t);
+}
+
+.pickme-status-retry:hover {
+	background: var(--pk-acc-soft);
+	border-color: var(--pk-acc);
+	color: var(--pk-acc-ink);
+}
+
+/* ---------- 目录 ---------- */
+
 /* PDF 目录面板：左侧栏 + 滚动区 */
 .pickme-pdf-body {
 	flex: 1;
@@ -55,8 +1178,9 @@
 	flex: none;
 	width: 232px;
 	overflow: auto;
-	padding: 6px 4px;
-	border-right: 1px solid var(--background-modifier-border);
+	padding: 6px 6px 12px;
+	background: var(--pk-bg2);
+	border-right: 1px solid var(--pk-line);
 }
 
 .pickme-pdf-toc.is-hidden {
@@ -64,456 +1188,53 @@
 }
 
 .pickme-pdf-toc-item {
-	padding: 3px 8px;
-	border-radius: 4px;
+	padding: 3px 7px;
+	border-radius: var(--pk-r-sm);
 	cursor: pointer;
-	line-height: 1.35;
-	color: var(--text-muted);
+	font-size: var(--pk-fs-sm);
+	line-height: 1.4;
+	color: var(--pk-ink4);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	transition: var(--pk-t);
 }
 
 .pickme-pdf-toc-item:hover {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
+	background: var(--pk-surface3);
+	color: var(--pk-ink);
 }
 
 .pickme-pdf-toc-item.is-current {
-	color: var(--text-normal);
+	color: var(--pk-acc-ink);
+	background: var(--pk-acc-soft);
 	font-weight: 600;
 }
 
 .pickme-pdf-toc-item.is-nolink {
 	cursor: default;
+	color: var(--pk-ink5);
+}
+
+.pickme-pdf-toc-item.is-nolink:hover {
+	background: transparent;
+	color: var(--pk-ink5);
 }
 
 .pickme-pdf-toc-toggle.is-hidden {
 	display: none;
 }
 
-.pickme-confirm-actions {
-	justify-content: flex-end;
-	margin-top: 14px;
-	gap: 10px;
-}
-
-.pickme-actions {
-	margin-top: 4px;
-}
-
-.pickme-question {
-	width: 100%;
-	resize: vertical;
-	font-family: inherit;
-}
-
-.pickme-checkbox {
-	display: flex;
-	align-items: center;
-	gap: 4px;
-	color: var(--text-muted);
-	font-size: var(--font-ui-smaller);
-}
-
-.pickme-entries {
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-	margin-top: 8px;
-}
-
-.pickme-card {
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 6px;
-	padding: 8px;
-	background: var(--background-secondary);
-}
-
-.pickme-card.is-active {
-	border-color: var(--interactive-accent);
-}
-
-.pickme-card.is-stale {
-	opacity: 0.75;
-	border-style: dashed;
-}
-
-.pickme-card-head {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	cursor: pointer;
-}
-
-.pickme-tag {
-	font-family: var(--font-monospace);
-	font-size: var(--font-ui-smaller);
-	background: var(--background-modifier-hover);
-	border-radius: 4px;
-	padding: 0 4px;
-}
-
-.pickme-kind {
-	font-size: var(--font-ui-smaller);
-	color: var(--text-muted);
-}
-
-.pickme-status-dot {
-	font-size: var(--font-ui-smaller);
-	margin-left: auto;
-}
-
-.pickme-status-dot.is-ok {
-	color: var(--color-green);
-}
-
-.pickme-status-dot.is-stale {
-	color: var(--color-red);
-}
-
-.pickme-selection {
-	margin: 6px 0;
-	padding-left: 8px;
-	border-left: 3px solid var(--pickme-highlight);
-	color: var(--text-normal);
-	font-size: var(--font-ui-small);
-}
-
-.pickme-qa {
-	margin-top: 6px;
-	border-top: 1px dashed var(--background-modifier-border);
-	padding-top: 6px;
-}
-
-.pickme-qa summary {
-	cursor: pointer;
-	font-size: var(--font-ui-small);
-	color: var(--text-muted);
-}
-
-.pickme-q {
-	margin-top: 4px;
-	font-size: var(--font-ui-small);
-	font-weight: 600;
-}
-
-.pickme-a {
-	margin-top: 4px;
-	font-size: var(--font-ui-small);
-	user-select: text;
-}
-
-.pickme-empty {
-	color: var(--text-muted);
-	font-size: var(--font-ui-small);
-	padding: 8px 0;
-}
-
-.pickme-suggest-preview {
-	color: var(--text-muted);
-	font-size: var(--font-ui-smaller);
-}
-
-/* 原文里的批注标记，底色由 body 上的样式类决定 */
-.pickme-mark {
-	border-radius: 2px;
-	cursor: pointer;
-}
-
-.pickme-mark:hover {
-	background: color-mix(in srgb, var(--pickme-highlight) 55%, transparent);
-}
-
-.pickme-anchor-widget {
-	display: none;
-}
-
-body {
-	--pickme-highlight: #f2c14e;
-}
-
-/* ---------- 视觉标记的三种样式（body 上的类由设置决定） ---------- */
-
-body.pickme-mark-background .pickme-mark {
-	background: color-mix(in srgb, var(--pickme-highlight) 35%, transparent);
-}
-
-body.pickme-mark-underline .pickme-mark {
-	background: transparent;
-	border-bottom: 2px solid var(--pickme-highlight);
-}
-
-body.pickme-mark-border .pickme-mark {
-	background: transparent;
-	border-left: 3px solid var(--pickme-highlight);
-	padding-left: 4px;
-}
-
-/* ---------- 侧边栏 ---------- */
-
-.pickme-model {
-	max-width: 46%;
-}
-
-.pickme-pdf-mark.is-flash {
-	outline: 2px solid var(--interactive-accent);
-	outline-offset: 1px;
-}
-
-/* ---------- PDF 查看器 ---------- */
-
-.pickme-pdf {
-	display: flex;
-	flex-direction: column;
-	height: 100%;
-	padding: 0;
-}
-
-/* 工具栏按功能分段：目录 ｜ 翻页 ｜ 缩放 ｜ 显示，段之间一条细线，状态提示靠最右 */
-.pickme-pdf-toolbar {
-	display: flex;
-	align-items: center;
-	gap: 3px;
-	padding: 5px 10px;
-	border-bottom: 1px solid var(--background-modifier-border);
-	flex-wrap: wrap;
-}
-
-/* 段与段之间的细线 */
-.pickme-pdf-sep {
-	width: 1px;
-	height: 16px;
-	margin: 0 6px;
-	background: var(--background-modifier-border);
-}
-
-/* 图标按钮：工具栏上不放文字，悬停才给提示 */
-.pickme-icon-button {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 28px;
-	height: 28px;
-	padding: 0;
-	border: none;
-	border-radius: 5px;
-	background: transparent;
-	box-shadow: none;
-	color: var(--text-muted);
-	cursor: pointer;
-}
-
-.pickme-icon-button:hover {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
-}
-
-/* 开着（目录展开 / 高亮开着）用强调色，关掉用更浅的灰 */
-.pickme-icon-button.is-active {
-	color: var(--text-accent);
-}
-
-/* 当前选中的标注方式：底色 + 描边都上强调色，别只靠图标深浅 */
-.pickme-pdf-mode.is-active {
-	background: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
-	color: var(--text-accent);
-	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 60%, transparent);
-}
-
-.pickme-pdf-mode.is-active:hover {
-	background: color-mix(in srgb, var(--interactive-accent) 28%, transparent);
-}
-
-.pickme-icon-button.is-off {
-	color: var(--text-faint);
-}
-
-.pickme-icon-button.is-hidden {
-	display: none;
-}
-
-.pickme-pdf-page {
-	width: 44px;
-	text-align: center;
-	padding: 2px 4px;
-}
-
-.pickme-pdf-total {
-	color: var(--text-faint);
-	font-size: var(--font-ui-smaller);
-	margin: 0 4px 0 2px;
-	white-space: nowrap;
-}
-
-/* 缩放百分比：兼作「回到 100%」按钮 */
-.pickme-pdf-zoom {
-	min-width: 52px;
-	padding: 2px 6px;
-	border: none;
-	border-radius: 5px;
-	background: transparent;
-	box-shadow: none;
-	color: var(--text-muted);
-	font-size: var(--font-ui-smaller);
-	font-variant-numeric: tabular-nums;
-	cursor: pointer;
-}
-
-.pickme-pdf-zoom:hover {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
-}
-
-/* 状态提示：吃掉剩下的空间，窄了就省略号，绝不把工具栏挤成两行 */
-.pickme-pdf-status {
-	margin-left: auto;
-	flex: 1 1 40px;
-	min-width: 0;
-	color: var(--text-faint);
-	font-size: var(--font-ui-smaller);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-/* 批注索引侧边栏 */
-.pickme-index-tools {
-	gap: 8px;
-	margin-bottom: 10px;
-}
-
-.pickme-index-filter {
-	flex: 1;
-	min-width: 0;
-}
-
-.pickme-index-link {
-	margin-left: auto;
-	font-size: var(--font-ui-smaller);
-	color: var(--text-muted);
-	cursor: pointer;
-}
-
-.pickme-index-link:hover {
-	color: var(--text-accent);
-}
-
-.pickme-index-list {
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
-}
-
-.pickme-index-source {
-	display: flex;
-	align-items: baseline;
-	gap: 8px;
-	margin-bottom: 4px;
-}
-
-.pickme-index-name {
-	font-weight: 600;
-	cursor: pointer;
-}
-
-.pickme-index-source .pickme-count {
-	margin-left: auto;
-}
-
-.pickme-index-entry {
-	display: flex;
-	align-items: flex-start;
-	gap: 8px;
-	padding: 4px 6px;
-	border-radius: 5px;
-	cursor: pointer;
-}
-
-.pickme-index-entry:hover {
-	background: var(--background-modifier-hover);
-}
-
-.pickme-index-entry:focus-visible,
-.pickme-index-name:focus-visible {
-	outline: 2px solid var(--interactive-accent);
-	outline-offset: -2px;
-}
-
-.pickme-index-body {
-	flex: 1 1 auto;
-	min-width: 0;
-}
-
-/* PDF 批注的框选小图：固定框 + cover，宽扁的区域截图也不会把行压成一条缝 */
-.pickme-index-thumb {
-	flex: 0 0 auto;
-	width: 56px;
-	height: 40px;
-	object-fit: cover;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 3px;
-}
-
-.pickme-index-what {
-	line-height: 1.35;
-}
-
-.pickme-index-meta {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 10px;
-	margin-top: 2px;
-	color: var(--text-faint);
-	font-size: var(--font-ui-smaller);
-}
-
-.pickme-index-ok {
-	color: var(--text-success);
-}
-
-.pickme-index-warn {
-	color: var(--text-warning);
-}
-
-/* 失效批注默认折起来，展开才逐条列出 */
-.pickme-index-stale-toggle {
-	margin-top: 4px;
-	padding: 3px 6px;
-	border-radius: 5px;
-	color: var(--text-muted);
-	cursor: pointer;
-	font-size: var(--font-ui-smaller);
-	user-select: none;
-}
-
-.pickme-index-stale-toggle:hover {
-	background: var(--background-modifier-hover);
-}
-
-.pickme-index-stale-toggle:focus-visible {
-	outline: 2px solid var(--interactive-accent);
-	outline-offset: -2px;
-}
-
-.pickme-index-entry.is-stale {
-	opacity: 0.7;
-}
-
-.pickme-index-reason {
-	margin-top: 1px;
-	color: var(--text-faint);
-	font-size: var(--font-ui-smaller);
-	line-height: 1.35;
-}
+/* ---------- 页面区 ---------- */
 
 .pickme-pdf-scroll {
 	flex: 1;
 	overflow: auto;
-	padding: 16px;
+	padding: 14px;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
+	background: var(--pk-bg);
 	/* 连续滚动：一根滚动条管整个文档，滚动位置自己记，不用浏览器锚定 */
 	overflow-anchor: none;
 }
@@ -523,77 +1244,15 @@ body.pickme-mark-border .pickme-mark {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: 14px;
+	gap: 12px;
 }
 
 /* 单页：没渲染出来时也是同样大小的一张白纸，滚动条长度从一开始就是对的 */
 .pickme-pdf-sheet {
 	position: relative;
-	background: var(--background-primary);
+	background: var(--pk-paper);
 	box-shadow: var(--shadow-s);
-}
-
-/* 荧光笔的批注框：一句话备注，不是问答 */
-.pickme-note {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-}
-
-.pickme-note-input {
-	width: 100%;
-	min-height: 56px;
-	resize: vertical;
-	font-family: inherit;
-	font-size: var(--font-ui-small);
-}
-
-.pickme-note-text {
-	margin-top: 2px;
-	color: var(--text-muted);
-	font-size: var(--font-ui-smaller);
-	font-style: italic;
-}
-
-.pickme-note-remove {
-	color: var(--text-error);
-}
-
-/* 便利贴：页面上只留一个小图标，内容点开才看（有内容是实心，空的是虚线） */
-.pickme-pdf-sticky {
-	position: absolute;
-	inset: 0;
-	width: 100%;
-	height: 100%;
-	max-width: 22px;
-	max-height: 22px;
-	border-radius: 3px 3px 3px 8px;
-	/* 和主题背景混出来的浅黄：深浅主题都不过艳，还能一眼认出是便利贴 */
-	background: color-mix(in srgb, var(--color-yellow, #ffd54a) 62%, var(--background-primary));
-	box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-normal) 18%, transparent), 0 1px 2px rgba(0, 0, 0, 0.18);
-}
-
-.pickme-pdf-sticky.is-empty {
-	background: color-mix(in srgb, var(--color-yellow, #ffd54a) 34%, var(--background-primary));
-	border: 1px dashed color-mix(in srgb, var(--text-normal) 30%, transparent);
-}
-
-/* 外接矩形自己不收指针事件（见 .pickme-pdf-mark），子形状必须自己声明，否则点图标会穿透到页面、
-   变成「在原地又放一个新便利贴」而不是「打开这一张」 */
-.pickme-pdf-sticky {
-	pointer-events: auto;
-	/* 能拖着换位置，所以给抓取光标而不是 pointer */
-	cursor: grab;
-}
-
-.pickme-pdf-sticky.is-dragging {
-	cursor: grabbing;
-	opacity: 0.85;
-}
-
-/* 便利贴模式：指针换成便利贴图标（热区在左上角） */
-.pickme-pdf-sheet.is-mode-note .pickme-pdf-overlay {
-	cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><rect x='4' y='4' width='16' height='16' rx='2' fill='%23ffe9a8' stroke='%23222' stroke-width='1.1'/><path d='M15 20v-5h5z' fill='%23e0c477'/></svg>") 6 6, copy;
+	border-radius: 2px;
 }
 
 .pickme-pdf-canvas {
@@ -612,6 +1271,11 @@ body.pickme-mark-border .pickme-mark {
 	cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='19' height='19' viewBox='0 0 24 24'><path d='M5.4 18.6l1.9-3.2 8.4-8.4 2.8 2.8-8.4 8.4z' fill='%23ffd54a' stroke='%23222' stroke-width='1.3' stroke-linejoin='round'/><path d='M2.6 21.4h18.8' stroke='%2398cbed' stroke-width='2.8' stroke-linecap='round'/><path d='M16.6 6.1l1.5-1.5a1.5 1.5 0 0 1 2.2 2.2l-1.5 1.5z' fill='%23c9ced6' stroke='%23222' stroke-width='1.3' stroke-linejoin='round'/></svg>") 3 15, text;
 }
 
+/* 便利贴模式：指针换成便利贴图标（热区在左上角） */
+.pickme-pdf-sheet.is-mode-note .pickme-pdf-overlay {
+	cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><rect x='4' y='4' width='16' height='16' rx='2' fill='%23ffe9a8' stroke='%23222' stroke-width='1.1'/><path d='M15 20v-5h5z' fill='%23e0c477'/></svg>") 6 6, copy;
+}
+
 /* 真正开始划的时候（按下未松手）换成没有笔身的纯笔触，减少对文字的遮挡 */
 .pickme-pdf-sheet.is-inking .pickme-pdf-overlay {
 	cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='19' height='19' viewBox='0 0 24 24'><path d='M4.5 19.5L19.5 4.5' stroke='%23ffd54a' stroke-width='6.5' stroke-linecap='round' opacity='0.9'/><path d='M4.5 19.5l3.6-3.6' stroke='%23222' stroke-width='1.5' stroke-linecap='round'/></svg>") 3 15, text;
@@ -619,8 +1283,9 @@ body.pickme-mark-border .pickme-mark {
 
 .pickme-pdf-marquee {
 	position: absolute;
-	border: 1px solid var(--interactive-accent);
-	background: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+	border: 1px solid var(--pk-acc);
+	background: color-mix(in srgb, var(--pk-acc) 14%, transparent);
+	border-radius: 2px;
 	pointer-events: none;
 }
 
@@ -641,9 +1306,11 @@ body.pickme-mark-border .pickme-mark {
 
 /* 拖动中的自由笔迹：就是用户划出来的样子（半透明荧光笔），松手才吸附成规整色带 */
 .pickme-pdf-ink path {
-	stroke: color-mix(in srgb, var(--pickme-highlight) 55%, transparent);
+	stroke: color-mix(in srgb, var(--pk-hi) 55%, transparent);
 	fill: none;
 }
+
+/* ---------- 页面上的批注形状 ---------- */
 
 /* 一条批注的容器：只占它的外接矩形，自己不吃指针事件（空白处点不开批注） */
 .pickme-pdf-mark {
@@ -654,30 +1321,32 @@ body.pickme-mark-border .pickme-mark {
 /* 荧光行：像荧光笔压过纸面，正片叠底让文字透出来 */
 .pickme-pdf-band {
 	position: absolute;
-	background: color-mix(in srgb, var(--pickme-highlight) 40%, transparent);
+	background: color-mix(in srgb, var(--pk-hi) 40%, transparent);
 	mix-blend-mode: multiply;
-	border-radius: 1px;
+	border-radius: 2px;
 	pointer-events: auto;
 	cursor: pointer;
+	transition: background-color 0.14s ease, box-shadow 0.14s ease;
 }
 
 /* 框选：细描边、几乎不填充，和色带叠在一起也不会糊成一块 */
 .pickme-pdf-box {
 	position: absolute;
-	border: 1px solid rgb(74 122 178 / 72%);
-	background: rgb(74 122 178 / 5%);
-	border-radius: 1px;
+	border: 1px solid color-mix(in srgb, var(--pk-acc) 62%, transparent);
+	background: color-mix(in srgb, var(--pk-acc) 5%, transparent);
+	border-radius: 2px;
 	pointer-events: auto;
 	cursor: pointer;
+	transition: var(--pk-t);
 }
 
 .pickme-pdf-mark:hover .pickme-pdf-box {
-	border-color: rgb(60 110 170 / 95%);
+	border-color: color-mix(in srgb, var(--pk-acc) 90%, transparent);
 }
 
 /* 正在读的那条完整显形，同页其它批注退到背景 */
 .pickme-pdf-mark.is-active .pickme-pdf-band {
-	background: color-mix(in srgb, var(--pickme-highlight) 52%, transparent);
+	background: color-mix(in srgb, var(--pk-hi) 52%, transparent);
 }
 
 .pickme-pdf-mark.is-active .pickme-pdf-sticky {
@@ -685,7 +1354,7 @@ body.pickme-mark-border .pickme-mark {
 }
 
 .pickme-pdf-mark.is-active .pickme-pdf-box {
-	border-color: rgb(60 110 170 / 95%);
+	border-color: color-mix(in srgb, var(--pk-acc) 90%, transparent);
 }
 
 .pickme-pdf-overlay:has(.pickme-pdf-mark.is-active) .pickme-pdf-mark:not(.is-active) {
@@ -702,7 +1371,7 @@ body.pickme-mark-border .pickme-mark {
 }
 
 .pickme-pdf-mark.is-stale .pickme-pdf-band {
-	outline: 1px dashed var(--pickme-highlight);
+	outline: 1px dashed var(--pk-hi);
 	outline-offset: 1px;
 }
 
@@ -711,13 +1380,13 @@ body.pickme-mark-border .pickme-mark {
 	display: none;
 	position: absolute;
 	left: 0;
-	top: -13px;
-	padding: 0 4px;
-	border-radius: 2px;
-	background: rgb(60 110 170 / 95%);
+	top: -14px;
+	padding: 0 5px;
+	border-radius: var(--pk-pill);
+	background: color-mix(in srgb, var(--pk-acc) 95%, transparent);
 	color: #fff;
-	font-size: 8.5px;
-	line-height: 13px;
+	font-size: var(--pk-fs-xs);
+	line-height: 14px;
 	white-space: nowrap;
 	pointer-events: none;
 }
@@ -729,27 +1398,65 @@ body.pickme-mark-border .pickme-mark {
 
 .pickme-pdf-mark.is-flash .pickme-pdf-band,
 .pickme-pdf-mark.is-flash .pickme-pdf-box {
-	outline: 2px solid var(--interactive-accent);
+	outline: 2px solid var(--pk-acc);
 	outline-offset: 1px;
 }
 
-.pickme-thumb {
-	display: block;
-	max-width: 100%;
-	max-height: 140px;
-	margin: 6px 0;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 4px;
-	cursor: pointer;
+.pickme-pdf-mark.is-flash .pickme-pdf-label {
+	outline: 2px solid var(--pk-acc);
+	outline-offset: 1px;
 }
 
-/* ---------- 页面内提问面板（PDF 页面 / 阅读视图） ---------- */
+/* 便利贴：页面上只留一个小图标，内容点开才看（有内容是实心，空的是虚线） */
+.pickme-pdf-sticky {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	max-width: 22px;
+	max-height: 22px;
+	border-radius: 5px 5px 5px 9px;
+	/* 和主题背景混出来的浅黄：深浅主题都不过艳，还能一眼认出是便利贴 */
+	background: color-mix(in srgb, var(--color-yellow, #ffd54a) 62%, var(--pk-paper));
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-normal) 18%, transparent),
+		0 1px 2px rgba(0, 0, 0, 0.18);
+	transition: transform 0.14s ease, box-shadow 0.14s ease, opacity 0.14s ease;
+}
+
+.pickme-pdf-sticky.is-empty {
+	background: color-mix(in srgb, var(--color-yellow, #ffd54a) 34%, var(--pk-paper));
+	border: 1px dashed color-mix(in srgb, var(--text-normal) 30%, transparent);
+}
+
+/* 外接矩形自己不收指针事件（见 .pickme-pdf-mark），子形状必须自己声明，否则点图标会穿透到页面、
+   变成「在原地又放一个新便利贴」而不是「打开这一张」 */
+.pickme-pdf-sticky {
+	pointer-events: auto;
+	/* 能拖着换位置，所以给抓取光标而不是 pointer */
+	cursor: grab;
+}
+
+.pickme-pdf-sticky.is-dragging {
+	cursor: grabbing;
+	opacity: 0.85;
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--pk-acc) 55%, transparent),
+		0 4px 10px rgba(0, 0, 0, 0.22);
+}
+
+/* ==========================================================
+   页面内提问面板（PDF 页面 / 阅读视图）
+   ========================================================== */
 
 .pickme-inline-layer {
 	position: absolute;
 	inset: 0;
 	pointer-events: none;
 	z-index: 20;
+}
+
+/* 宿主视图是 static 定位时补的相对定位容器（面板的浮层要挂在它下面） */
+.pickme-ask-host-relative {
+	position: relative;
 }
 
 .pickme-panel {
@@ -761,35 +1468,41 @@ body.pickme-mark-border .pickme-mark {
 	overscroll-behavior: contain;
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
-	padding: 8px 10px 10px;
-	background: var(--background-primary);
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 8px;
+	gap: 5px;
+	padding: 7px 9px 9px;
+	background: var(--pk-surface);
+	border: 1px solid var(--pk-line2);
+	border-radius: var(--pk-r);
 	box-shadow: var(--shadow-l);
 }
 
 .pickme-panel-head {
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	gap: 5px;
+	padding-bottom: 5px;
+	border-bottom: 1px solid var(--pk-line);
 }
 
 .pickme-panel-close {
 	margin-left: auto;
+	width: 20px;
+	height: 20px;
+	padding: 0;
 	background: transparent;
 	border: none;
+	border-radius: var(--pk-r-sm);
 	box-shadow: none;
-	color: var(--text-muted);
+	color: var(--pk-ink4);
 	cursor: pointer;
-	font-size: 16px;
+	font-size: 14px;
 	line-height: 1;
-	padding: 0 4px;
+	transition: var(--pk-t);
 }
 
 .pickme-panel-close:hover {
-	color: var(--text-normal);
-	background: var(--background-modifier-hover);
+	color: var(--pk-ink);
+	background: var(--pk-surface3);
 }
 
 .pickme-panel .pickme-selection {
@@ -797,8 +1510,8 @@ body.pickme-mark-border .pickme-mark {
 }
 
 .pickme-panel-history {
-	border-top: 1px solid var(--background-modifier-border);
-	padding-top: 6px;
+	border-top: 1px solid var(--pk-line);
+	padding-top: 5px;
 }
 
 .pickme-panel .pickme-composer {
@@ -806,15 +1519,40 @@ body.pickme-mark-border .pickme-mark {
 	padding: 0;
 }
 
-.pickme-hint {
-	color: var(--text-muted);
-	font-size: var(--font-ui-smaller);
-	padding: 6px 0;
-	border-bottom: 1px solid var(--background-modifier-border);
+/* ==========================================================
+   设置页：模板清单
+   ========================================================== */
+
+.pickme-template-list {
+	font-size: var(--pk-fs);
+	color: var(--pk-ink);
 }
 
+.pickme-template-list .setting-item {
+	padding: 6px 0;
+	border-top: 1px solid var(--pk-line);
+}
 
-/* 宿主视图是 static 定位时补的相对定位容器（面板的浮层要挂在它下面） */
-.pickme-ask-host-relative {
-	position: relative;
+/* ==========================================================
+   减少动效：系统开了「减弱动态效果」就不要再有过渡
+   ========================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+	.pickme-sidebar *,
+	.pickme-index *,
+	.pickme-pdf *,
+	.pickme-panel *,
+	.pickme-mark,
+}
+
+/* 截图文件可能已经不在（清理过或手动删过）：加载失败就整块收掉，别留破图标 */
+.pickme-index-thumb.is-broken {
+	display: none;
+}
+
+/* 标注方式选中态：底色 + 内描边 + 图标同色，三重确认当前模式 */
+.pickme-pdf-toolbar .pickme-icon-button.is-active {
+	background: var(--pk-acc-soft);
+	box-shadow: inset 0 0 0 1px var(--pk-acc-line);
+	color: var(--pk-acc-ink);
 }

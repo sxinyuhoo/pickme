@@ -275,7 +275,7 @@ export const EN: Record<string, string> = {
 	'Pick Me：批注索引': 'Pick Me: annotation index',
 	'批注索引': 'Annotation index',
 	'{v0} 条批注 · {v1} 个文档': '{v0} annotations · {v1} documents',
-	'过滤：文档名、选区或锚点 id': 'Filter by document, selection or anchor id',
+	'过滤批注…': 'Filter annotations…',
 	'刷新': 'Refresh',
 	'没有匹配的批注。': 'No annotations match.',
 	'还没有批注。选中正文或框选 PDF 之后，这里就有条目了。':
@@ -289,6 +289,15 @@ export const EN: Record<string, string> = {
 	'原文已改动，锚点找不到了': "The source text changed; the anchor can't be found",
 	'用命令「重新绑定失效锚点」可以把它挂回原文': 'Use the command "Rebind stale anchors" to attach it again',
 	'pickme：找不到源文档 {v0}': 'Pick Me: source document not found — {v0}',
+	// 批注索引：多选与批量删除
+	'多选': 'Multi-select',
+	'已选 {v0} 条': 'Selected {v0}',
+	'全选': 'Select all',
+	'取消选择': 'Clear selection',
+	'删除所选': 'Delete selected',
+	'删除 {v0} 条批注？正文里对应的锚点标签会一并移除，原文其它内容不会改动；PDF 批注的区域截图会一起删掉。':
+		'Delete {v0} annotations? Their anchor tags in the source are removed too, nothing else in the source is changed, and region screenshots of PDF annotations are deleted along with them.',
+	'已删除 {v0} 条批注': 'Deleted {v0} annotations',
 	'全部批注（索引）': 'All annotations (index)',
 	'打开批注索引': 'Open annotation index',
 	// PDF 目录面板
