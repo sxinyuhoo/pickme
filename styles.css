@@ -702,7 +702,6 @@ body.pickme-mark-border .pickme-mark {
 }
 
 .pickme-index .pickme-count {
-	padding-left: 2px;
 	font-size: 10px;
 	color: color-mix(in srgb, var(--pk-ink) 52%, transparent);
 	font-variant-numeric: tabular-nums;

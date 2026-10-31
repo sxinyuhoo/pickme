@@ -2,6 +2,10 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.1.5
+
+- 批注索引：统计文字与标题、文档名严格左对齐（去掉 2px 缩进）
+
 ## 1.1.4
 
 - 批注索引留白重排：四周留出内边距，标题与统计分成两行，搜索框变矮、不再贴边
