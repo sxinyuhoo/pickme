@@ -220,7 +220,7 @@ export class PickmeIndexView extends ItemView {
 	}
 
 	private async openSource(group: IndexGroup): Promise<void> {
-		const file = this.plugin.app.vault.getAbstractFileByPath(group.sourcePath);
+		const file = this.plugin.resolveSourceFile(group.sourcePath);
 		if (!(file instanceof TFile)) {
 			new Notice(t('pickme：找不到源文档 {v0}', { v0: group.sourcePath }));
 			return;

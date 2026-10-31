@@ -294,6 +294,39 @@ function strokeSpanInBand(
 	return min <= max ? [min, max] : null;
 }
 
+/** 整笔的横向范围 [left, right]，补间时用来判断某一行是否与笔迹有横向交集 */
+function strokeHorizontalRange(points: StrokePoint[]): [number, number] {
+	let left = Infinity;
+	let right = -Infinity;
+	for (const point of points) {
+		if (point.x < left) left = point.x;
+		if (point.x > right) right = point.x;
+	}
+	return [left, right];
+}
+
+/**
+ * 笔迹在某个基线高度上的横坐标：找跨过该 y 的线段做线性插值。
+ * 快速划过多行时中间几行一整个命中项都没有，只能靠这个位置把行带补回去；
+ * 该 y 没被任何线段跨过（笔迹没经过这条基线）时返回 null。
+ */
+function strokeXAtY(points: StrokePoint[], y: number): number | null {
+	for (let i = 1; i < points.length; i++) {
+		const a = points[i - 1];
+		const b = points[i];
+		if (a.y === b.y) {
+			if (a.y === y) return a.x;
+			continue;
+		}
+		// 两端落在基线同一侧：这一小段没跨过该 y
+		if ((a.y - y) * (b.y - y) > 0) continue;
+		const t = (y - a.y) / (b.y - a.y);
+		if (t < 0 || t > 1) continue;
+		return a.x + (b.x - a.x) * t;
+	}
+	return null;
+}
+
 /** 整笔在横/纵方向上的跨度，用来识别「以竖向为主」的一笔 */
 function strokeExtent(points: StrokePoint[]): { width: number; height: number } {
 	let minX = Infinity;
@@ -307,6 +340,109 @@ function strokeExtent(points: StrokePoint[]): { width: number; height: number } 
 		if (point.y > maxY) maxY = point.y;
 	}
 	return { width: maxX - minX, height: maxY - minY };
+}
+
+/**
+ * 一行文字项 → 行带（矩形夹住命中项范围）。
+ * anchor 为 null 时是笔迹真划中的行：横向取笔迹在该行带内的跨度；
+ * 给了 anchor 就是补间出来的行（笔迹没划中），只按插值出来的落点给出一个窄带。
+ */
+function buildLineBox(
+	sampled: StrokePoint[],
+	run: TextItemBox[],
+	extent: { width: number; height: number },
+	anchor: number | null = null,
+): LineBox {
+	const height = Math.max(...run.map((item) => item.height), MIN_TEXT_HEIGHT);
+	// 基线取行内字高最大的那一项（主字号），免得下标把整条带往下拖
+	const base = run.reduce((best, item) => (item.height > best.height ? item : best), run[0]).y;
+	// 横向只覆盖命中项范围（双栏断开后的一段）
+	const itemLeft = Math.min(...run.map((item) => item.x));
+	const itemRight = Math.max(...run.map((item) => item.x + item.width));
+	let x0 = itemLeft;
+	let x1 = itemRight;
+	if (anchor === null) {
+		// 笔迹在本行带上的横向跨度，再夹进命中项范围：划多少算多少，不整项铺满
+		const span = strokeSpanInBand(
+			sampled,
+			base - height * BAND_BOTTOM - HIT_TOLERANCE,
+			base + height * BAND_TOP + HIT_TOLERANCE,
+		);
+		if (span) {
+			x0 = Math.max(itemLeft, span[0] - HIGHLIGHT_PAD);
+			x1 = Math.min(itemRight, span[1] + HIGHLIGHT_PAD);
+		}
+		// 竖向为主的笔画（纵向跨多行、横向几乎不动）：这一行改用命中项的完整范围，
+		// 而不是笔迹跨度 —— 竖着往下拖就等于「整行整行地划」，不再只留一个几 pt 宽的细条。
+		const spanWidth = span ? span[1] - span[0] : 0;
+		if (
+			spanWidth < height * VERTICAL_STROKE_SPAN_FACTOR &&
+			extent.height >= extent.width * VERTICAL_STROKE_RATIO + height
+		) {
+			x0 = itemLeft;
+			x1 = itemRight;
+		}
+	} else {
+		// 补间行：笔迹确实跨过这条基线，但从文字旁边掠过去了。
+		// 只按插值点给 ±1pt 的话只有 2~4pt 宽，肉眼等于没补上，
+		// 所以取该项范围 ∩ 笔迹整体横向包围盒，再把插值落点并进去。
+		const [strokeLeft, strokeRight] = strokeHorizontalRange(sampled);
+		const at = Math.min(Math.max(anchor, itemLeft), itemRight);
+		x0 = Math.max(itemLeft, Math.min(at - HIGHLIGHT_PAD, strokeLeft - HIGHLIGHT_PAD));
+		x1 = Math.min(itemRight, Math.max(at + HIGHLIGHT_PAD, strokeRight + HIGHLIGHT_PAD));
+	}
+	// 竖划或极短笔迹会算出零宽，撑到最小宽度后再夹回命中项范围
+	if (x1 - x0 < HIGHLIGHT_MIN_WIDTH) {
+		const mid = (x0 + x1) / 2;
+		x0 = Math.max(itemLeft, mid - HIGHLIGHT_MIN_WIDTH / 2);
+		x1 = Math.min(itemRight, mid + HIGHLIGHT_MIN_WIDTH / 2);
+	}
+	return {
+		rect: [x0, base - height * BAND_BOTTOM, x1, base + height * BAND_TOP],
+		items: run,
+	};
+}
+
+/**
+ * 补间：一笔快速划过多行时 pointermove 事件会被吞，中间几行一个命中项都没有，
+ * 结果只有首尾行亮起来。在命中行基线的最大/最小值之间，把页面里既没被笔迹碰到、
+ * 又与笔迹横向有交集的行补成行带 —— 用户的要求是「哪怕没画中也补上中间空白」。
+ * 横向取笔迹在该基线上的插值位置，插不出来（笔迹没跨过该 y）就不补。
+ */
+function tweenLines(
+	all: TextItemBox[],
+	hitGroups: TextItemBox[][],
+	sampled: StrokePoint[],
+	extent: { width: number; height: number },
+): LineBox[] {
+	// 单行命中不补：首尾之间没有可供插值的行
+	if (hitGroups.length < 2) return [];
+	const bases = hitGroups.map(
+		(group) => group.reduce((best, item) => (item.height > best.height ? item : best), group[0]).y,
+	);
+	const top = Math.max(...bases);
+	const bottom = Math.min(...bases);
+	if (top - bottom <= 0) return [];
+	const hitItems = new Set(hitGroups.flat());
+	const [strokeLeft, strokeRight] = strokeHorizontalRange(sampled);
+	const lines: LineBox[] = [];
+	for (const group of groupByBaseline(all.filter((item) => item.str.trim() !== ''))) {
+		// 已经被笔迹命中的行不重复补
+		if (group.some((item) => hitItems.has(item))) continue;
+		const base = group.reduce((best, item) => (item.height > best.height ? item : best), group[0]).y;
+		// 只看首尾命中行「之间」的行，两端之外不补
+		if (base <= bottom || base >= top) continue;
+		const anchor = strokeXAtY(sampled, base);
+		if (anchor === null) continue;
+		// 同一基线上可能横跨中缝，逐段判断：另一栏、页边栏与笔迹没有横向交集，不补
+		for (const run of splitRuns(group)) {
+			const runLeft = Math.min(...run.map((item) => item.x));
+			const runRight = Math.max(...run.map((item) => item.x + item.width));
+			if (runRight < strokeLeft || runLeft > strokeRight) continue;
+			lines.push(buildLineBox(sampled, run, extent, anchor));
+		}
+	}
+	return lines;
 }
 
 /**
@@ -325,50 +461,14 @@ export function strokeToLines(items: TextItemBox[], points: StrokePoint[]): Line
 	// 整笔的横/纵跨度：用于「竖向为主的一笔 = 整行」的判定
 	const extent = strokeExtent(sampled);
 
+	// 命中的行按基线成组；同一基线上还可能横跨中缝（双栏、表格列），再按行内间距断开
+	const hitGroups = groupByBaseline(hit);
 	const lines: LineBox[] = [];
-	for (const group of groupByBaseline(hit)) {
-		// 同一基线上还可能横跨中缝（双栏、表格列），再按行内间距断开
-		for (const run of splitRuns(group)) {
-			const height = Math.max(...run.map((item) => item.height), MIN_TEXT_HEIGHT);
-			// 基线取行内字高最大的那一项（主字号），免得下标把整条带往下拖
-			const base = run.reduce((best, item) => (item.height > best.height ? item : best), run[0]).y;
-			// 横向只覆盖命中项范围（双栏断开后的一段）
-			const itemLeft = Math.min(...run.map((item) => item.x));
-			const itemRight = Math.max(...run.map((item) => item.x + item.width));
-			// 笔迹在本行带上的横向跨度，再夹进命中项范围：划多少算多少，不整项铺满
-			const span = strokeSpanInBand(
-				sampled,
-				base - height * BAND_BOTTOM - HIT_TOLERANCE,
-				base + height * BAND_TOP + HIT_TOLERANCE,
-			);
-			let x0 = itemLeft;
-			let x1 = itemRight;
-			if (span) {
-				x0 = Math.max(itemLeft, span[0] - HIGHLIGHT_PAD);
-				x1 = Math.min(itemRight, span[1] + HIGHLIGHT_PAD);
-			}
-			// 竖向为主的笔画（纵向跨多行、横向几乎不动）：这一行改用命中项的完整范围，
-			// 而不是笔迹跨度 —— 竖着往下拖就等于「整行整行地划」，不再只留一个几 pt 宽的细条。
-			const spanWidth = span ? span[1] - span[0] : 0;
-			if (
-				spanWidth < height * VERTICAL_STROKE_SPAN_FACTOR &&
-				extent.height >= extent.width * VERTICAL_STROKE_RATIO + height
-			) {
-				x0 = itemLeft;
-				x1 = itemRight;
-			}
-			// 竖划或极短笔迹会算出零宽，撑到最小宽度后再夹回命中项范围
-			if (x1 - x0 < HIGHLIGHT_MIN_WIDTH) {
-				const mid = (x0 + x1) / 2;
-				x0 = Math.max(itemLeft, mid - HIGHLIGHT_MIN_WIDTH / 2);
-				x1 = Math.min(itemRight, mid + HIGHLIGHT_MIN_WIDTH / 2);
-			}
-			lines.push({
-				rect: [x0, base - height * BAND_BOTTOM, x1, base + height * BAND_TOP],
-				items: run,
-			});
-		}
+	for (const group of hitGroups) {
+		for (const run of splitRuns(group)) lines.push(buildLineBox(sampled, run, extent));
 	}
+	// 命中行之间被事件吞掉的行补回来：首尾行本身的矩形不受影响
+	lines.push(...tweenLines(items, hitGroups, sampled, extent));
 	return lines.sort((a, b) => b.rect[3] - a.rect[3] || a.rect[0] - b.rect[0]);
 }
 

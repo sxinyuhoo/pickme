@@ -82,6 +82,19 @@ export class AnnotationRepository {
 			doc.sourceType = sourceType;
 			return { doc, filePath: path };
 		}
+		// 文档被移动/改名后，批注文件的路径还停在旧位置：按文件名兜底找一次（只认唯一命中，不猜）
+		const suffix = `/${sourceFile.name}.md`;
+		const files = await this.io.listFiles(this.dir());
+		const candidates = files.filter((candidate) => candidate.endsWith(suffix));
+		if (candidates.length === 1) {
+			const moved = await this.io.readText(candidates[0]);
+			if (moved !== null) {
+				const doc = parseAnnotationDoc(moved, candidates[0]);
+				doc.sourcePath = sourceFile.path;
+				doc.sourceType = sourceType;
+				return { doc, filePath: candidates[0] };
+			}
+		}
 		const now = nowIso();
 		return {
 			doc: {

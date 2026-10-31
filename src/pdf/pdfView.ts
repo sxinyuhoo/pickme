@@ -1048,6 +1048,8 @@ export class PickmePdfView extends FileView {
 			this.strokePoints = [point];
 			slot.preview.empty();
 			slot.preview.hide();
+			// 真正开始划的时候换「无笔身」的笔触光标，别让笔杆挡住要划的文字
+			slot.sheet.addClass('is-inking');
 		} else if (this.plugin.settings.pdfAnnotateMode === 'area') {
 			this.strokePoints = [];
 			slot.marquee.show();
@@ -1129,6 +1131,7 @@ export class PickmePdfView extends FileView {
 	}
 
 	private resetDrag(): void {
+		this.dragSlot?.sheet.removeClass('is-inking');
 		this.stickyDrag?.mark.removeClass('is-dragging');
 		this.stickyDrag = null;
 		this.dragSlot?.marquee.hide();

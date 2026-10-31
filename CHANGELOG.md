@@ -2,6 +2,17 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.0.15
+
+### Fixed
+
+- **A fast multi-line stroke no longer skips lines.** Sweeping the highlighter quickly across several lines can coalesce pointer events, and the lines in the middle were left out. Lines that fall between the first and last line actually touched are now filled in automatically — their band is interpolated from where the stroke crosses them — so a gap in your hand no longer becomes a gap in the highlight.
+- **The annotation index survives moving or renaming the source.** Rows used to resolve their document by the path stored in the annotation file, so moving the note or PDF broke the jump with “source not found”. The index now falls back to resolving by file name (Obsidian's own link resolution first, then a unique match in the vault), and the annotation file is located the same way after a move.
+
+### Changed
+
+- **Smaller highlighter cursor, and it gets out of the way while you draw.** The pen cursor is smaller, and once the mouse is down it switches to a bare stroke without the pen body, so less of the text you are highlighting is covered.
+
 ## 1.0.14
 
 ### Fixed

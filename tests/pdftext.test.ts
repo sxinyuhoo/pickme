@@ -363,3 +363,84 @@ test('竖向规则临界值未触发侧：纵向不足 2×横向 + 字高 → �
 	assert.ok(lines[0].rect[2] < 180, '右边界未铺满整行');
 });
 
+
+/* ---------- 补间：快速划线漏掉的中间行自动补上 ---------- */
+
+test('只碰第 1、3 行：中间第 2 行自动补上', () => {
+	const items = [
+		box('第一行', 100, 300, 80, 12),
+		box('第二行', 100, 280, 80, 12),
+		box('第三行', 100, 260, 80, 12),
+	];
+	// 一笔从左下折到右侧（x=250，超出首行文字项右端 180）再折回左下：
+	// 第 2 行的行带里笔迹一直在文字项之外，命中不到，但笔迹确实跨过了它的基线
+	const lines = strokeToLines(
+		items,
+		stroke([[110, 303], [140, 297], [250, 292], [250, 274], [140, 266], [110, 262]]),
+	);
+	assert.deepEqual(
+		lines.map((line) => line.items[0].str),
+		['第一行', '第二行', '第三行'],
+	);
+	// 补出来的行带落在文字项的范围里，不往右溢出到笔迹折返的 x=250 处
+	const tweened = lines[1];
+	assert.ok(tweened.rect[0] >= 100 && tweened.rect[2] <= 180, '补间的行带应落在文字项内');
+	// 不能只补出几 pt 的细条：宽度要和相邻命中行同一个量级
+	assert.ok(tweened.rect[2] - tweened.rect[0] > 40, '补间的行带应有足够宽度');
+	assert.equal(linesText(lines), '第一行\n第二行\n第三行');
+});
+
+test('只碰第 1、4 行（快速斜划）：中间 2、3 行都补上', () => {
+	const items = [
+		box('第一行', 100, 300, 80, 12),
+		box('第二行', 100, 280, 80, 12),
+		box('第三行', 100, 260, 80, 12),
+		box('第四行', 100, 240, 80, 12),
+	];
+	// 首行碰一下，然后沿 x=250 竖着划过第 2、3 行（都在文字项右侧），最后在 y=238 横回第四行
+	const lines = strokeToLines(
+		items,
+		stroke([[110, 303], [140, 297], [250, 292], [250, 238], [140, 238], [110, 236]]),
+	);
+	assert.deepEqual(
+		lines.map((line) => line.items[0].str),
+		['第一行', '第二行', '第三行', '第四行'],
+	);
+	assert.equal(linesText(lines), '第一行\n第二行\n第三行\n第四行');
+});
+
+test('双栏页面只碰左栏第 1、3 行：不往右栏补', () => {
+	// 真机场景：docker cheatsheet 第 1 页，左栏 x=36 宽 233.5（右端 269.5），右栏 x=319.5
+	const items = [
+		box('左一', 36, 495, 233.5, 8),
+		box('右一', 319.5, 495, 83, 8),
+		box('左二', 36, 475, 233.5, 8),
+		box('右二', 319.5, 475, 83, 8),
+		box('左三', 36, 455, 233.5, 8),
+		box('右三', 319.5, 455, 83, 8),
+	];
+	// 碰左栏首行，沿 x=280（中缝里，两栏都不沾）竖着滑过第 2 行，再回到左栏第 3 行
+	const lines = strokeToLines(
+		items,
+		stroke([[60, 500], [90, 494], [280, 490], [280, 450], [60, 457]]),
+	);
+	assert.deepEqual(
+		lines.map((line) => line.items[0].str),
+		['左一', '左二', '左三'],
+	);
+	// 右栏三行都没有行带
+	assert.equal(lines.some((line) => line.items[0].str.startsWith('右')), false);
+	// 补出来的左栏第 2 行也没越到右栏
+	close(lines[1].rect[2], 269.5, '补间行右边界夹在左栏内');
+});
+
+test('单行命中不补间：结果与原来一致', () => {
+	const items = [box('最大纵坡不应大于 3%', 100, 200, 120, 12), box('下一行正文', 100, 150, 120, 12)];
+	const lines = strokeToLines(items, stroke([[100, 202], [220, 202]]));
+	assert.equal(lines.length, 1);
+	close(lines[0].rect[0], 100, '左边界');
+	close(lines[0].rect[1], 196.4, '下边界');
+	close(lines[0].rect[2], 220, '右边界');
+	close(lines[0].rect[3], 209.6, '上边界');
+	assert.equal(linesText(lines), '最大纵坡不应大于 3%');
+});

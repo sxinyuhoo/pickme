@@ -254,9 +254,24 @@ export default class PickmePlugin extends Plugin {
 		throw new Error('unexpected view');
 	}
 
+	/**
+	 * 用索引里存下来的路径找源文档。文档被移动/改名后路径就失效了，
+	 * 这时退回按文件名解析（先走 Obsidian 自己的链接解析，再退回全库唯一同名文件）。
+	 */
+	resolveSourceFile(path: string): TFile | null {
+		const direct = this.app.vault.getAbstractFileByPath(path);
+		if (direct instanceof TFile) return direct;
+		const name = (path.split('/').pop() ?? '').replace(/\.md$/, '');
+		const linked =
+			this.app.metadataCache.getFirstLinkpathDest(name, '') ?? this.app.metadataCache.getFirstLinkpathDest(path, '');
+		if (linked instanceof TFile) return linked;
+		const sameName = this.app.vault.getFiles().filter((candidate) => candidate.basename === name);
+		return sameName.length === 1 ? sameName[0] : null;
+	}
+
 	/** 从批注索引跳到某条批注：先打开源文档，再定位 */
 	async openEntryAt(sourcePath: string, id: string): Promise<void> {
-		const file = this.app.vault.getAbstractFileByPath(sourcePath);
+		const file = this.resolveSourceFile(sourcePath);
 		if (!(file instanceof TFile)) {
 			new Notice(t('pickme：找不到源文档 {v0}', { v0: sourcePath }));
 			return;
