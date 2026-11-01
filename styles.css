@@ -1645,6 +1645,7 @@ body.pickme-mark-border .pickme-mark {
 }
 
 .pickme-pdf-mark.is-active .pickme-pdf-label,
+.pickme-pdf-mark.is-hover .pickme-pdf-label,
 .pickme-pdf-mark:hover .pickme-pdf-label {
 	display: block;
 }
@@ -1829,15 +1830,51 @@ body.pickme-mark-border .pickme-mark {
 }
 
 
-/* 举着工具（荧光笔/框选/便利贴）时，批注对指针透明：
-   否则想在一个已有的框上划荧光笔，落笔只会打开那条批注。
-   子元素自己写着 pointer-events: auto，所以得连它们一起关掉 */
-.pickme-pdf-tool-active .pickme-pdf-mark,
-.pickme-pdf-tool-active .pickme-pdf-band,
-.pickme-pdf-tool-active .pickme-pdf-box,
-.pickme-pdf-tool-active .pickme-pdf-sticky,
-.pickme-pdf-tool-active .pickme-pdf-label {
-	pointer-events: none !important;
+/* 形状本身永远不吃指针：任何模式下都能在已有批注上落笔。
+   点开批注改走「把手」（见 .pickme-pdf-handle）与便利贴图标。 */
+.pickme-pdf-mark,
+.pickme-pdf-band,
+.pickme-pdf-box,
+.pickme-pdf-label {
+	pointer-events: none;
+}
+
+/* 吸附在批注左侧的小把手：唯一可以点开这条批注的地方（便利贴用它自己的图标） */
+.pickme-pdf-handle {
+	position: absolute;
+	width: 12px;
+	height: 12px;
+	border: 1px solid color-mix(in srgb, var(--pk-acc) 70%, transparent);
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--pk-acc) 22%, var(--background-primary));
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+	pointer-events: auto;
+	cursor: pointer;
+	opacity: 0.55;
+	transition: opacity 0.14s ease, transform 0.14s ease, background-color 0.14s ease;
+}
+
+/* 指针靠近（悬停到这条批注的把手）时把手变实、微微放大 */
+.pickme-pdf-handle:hover {
+	opacity: 1;
+	transform: scale(1.25);
+	background: var(--pk-acc);
+}
+
+.pickme-pdf-mark.is-hover .pickme-pdf-handle,
+.pickme-pdf-mark.is-active .pickme-pdf-handle {
+	opacity: 1;
+}
+
+/* 正在读/悬停那条的把手用实心强调色，一眼看出「就是它」 */
+.pickme-pdf-mark.is-hover .pickme-pdf-handle,
+.pickme-pdf-mark.is-active .pickme-pdf-handle {
+	background: var(--pk-acc);
+}
+
+/* 便利贴：图标本身就是把手 */
+.pickme-pdf-sticky {
+	pointer-events: auto;
 }
 
 /* 浏览态（没选任何工具）：普通箭头，批注可以点。

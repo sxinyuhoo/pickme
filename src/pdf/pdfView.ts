@@ -1181,6 +1181,18 @@ export class PickmePdfView extends FileView {
 					height: `${Math.max(2, screen[3] - screen[1])}px`,
 				});
 			}
+			// 每条批注一个「把手」：只有把手上能点开，形状本身永远不吃指针。
+			// 这样在任何模式（举着笔/浏览）都能落笔，也都能点开批注，不用来回切模式。
+			// 位置统一在左侧：框是左边缘中点，荧光带是行带开头（左右统一一个方向，才好找）。
+			if (!isSticky) {
+				const handle = mark.createDiv({ cls: 'pickme-pdf-handle' });
+				handle.setCssProps({
+					left: '-7px',
+					top: `${Math.round((outer[3] - outer[1]) / 2) - 6}px`,
+				});
+				handle.setAttribute('title', entry.qas[0]?.question ?? t('第 {v0} 页 · {v1}', { v0: pdf.page, v1: this.shapeWord(pdf) }));
+			}
+
 			// 页码与形状标签：只在选中或悬停时显示，静止态保持页面干净
 			const label = mark.createDiv({ cls: 'pickme-pdf-label' });
 			label.setText(t('第 {v0} 页 · {v1}', { v0: pdf.page, v1: this.shapeWord(pdf) }));
@@ -1216,6 +1228,11 @@ export class PickmePdfView extends FileView {
 					// 忽略：捕获失败不影响拖动（指针还在页面上时事件照旧）
 				}
 			}
+			return;
+		}
+		// 浏览态：只用来阅读和点把手，落笔不产生任何东西
+		if (this.plugin.settings.pdfAnnotateMode === 'none') {
+			this.resetDrag();
 			return;
 		}
 		this.pendingMarkId = null;
