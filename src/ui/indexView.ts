@@ -73,8 +73,19 @@ export class PickmeIndexView extends ItemView {
 	}
 
 	async reload(): Promise<void> {
+		// 鼠标刚按下时不要重建：重建会把按住那一行的 DOM 换掉，
+		// 浏览器就永远不发 click 事件了——用户表现为「得点第二次才生效」。
+		const sincePress = Date.now() - this.lastPointerDownAt;
+		if (sincePress < 500) {
+			window.setTimeout(() => void this.reload(), 500 - sincePress + 30);
+			return;
+		}
 		this.groups = await this.plugin.repository.indexData();
 		this.prunePicked();
+		// 数据没变就别重建：白白丢掉焦点、滚动位置和正在进行的点击
+		const signature = JSON.stringify(this.groups);
+		if (signature === this.lastSignature && this.contentEl.childElementCount > 0) return;
+		this.lastSignature = signature;
 		this.render();
 	}
 
@@ -118,8 +129,18 @@ export class PickmeIndexView extends ItemView {
 		return `${group.sourcePath}::${entry.id}`;
 	}
 
+	/** 最近一次指针按下的时间（毫秒）：用来避免重建吃掉正在进行的点击 */
+	private lastPointerDownAt = 0;
+
+	/** 上一次渲染的数据指纹：没变化就不重建 */
+	private lastSignature = '';
+
 	private render(): void {
 		const root = this.contentEl;
+		// 记下指针按下的时刻：reload 靠它避让进行中的点击
+		root.addEventListener('pointerdown', () => {
+			this.lastPointerDownAt = Date.now();
+		});
 		root.empty();
 		root.addClass('pickme-sidebar');
 		root.addClass('pickme-index');

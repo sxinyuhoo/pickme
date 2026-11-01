@@ -1,5 +1,5 @@
 import { ItemView, MarkdownRenderer, Notice, TFile, WorkspaceLeaf, setIcon } from 'obsidian';
-import { t } from '../i18n.ts';
+import { t, templateLabel } from '../i18n.ts';
 import type PickmePlugin from '../main.ts';
 import type { AnnotationDoc, AnnotationEntry } from '../core/types.ts';
 import type { AskSink } from './askPanel.ts';
@@ -172,7 +172,7 @@ export class PickmeSidebarView extends ItemView implements AskSink {
 		const select = row.createEl('select', { cls: 'dropdown' });
 		select.createEl('option', { text: t('直接提问'), value: '' });
 		for (const name of templateNames) {
-			select.createEl('option', { text: name, value: name });
+			select.createEl('option', { text: templateLabel(name), value: name });
 		}
 		select.value = this.templateName;
 		select.onchange = () => {

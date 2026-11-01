@@ -1,5 +1,5 @@
 import { Component, MarkdownRenderer, TFile } from 'obsidian';
-import { t } from '../i18n.ts';
+import { t, templateLabel } from '../i18n.ts';
 import type PickmePlugin from '../main.ts';
 import { parseAnnotationDoc } from '../core/annotationDoc.ts';
 import { ConfirmModal } from './confirmModal.ts';
@@ -411,7 +411,8 @@ export class AskPanel implements AskSink {
 		const select = row.createEl('select', { cls: 'dropdown' });
 		select.createEl('option', { text: t('直接提问'), value: '' });
 		for (const name of this.templateNames) {
-			select.createEl('option', { text: name, value: name });
+			// 内置模板（解释/摘要/翻译）按界面语言显示名字，自定义模板原样
+			select.createEl('option', { text: templateLabel(name), value: name });
 		}
 		select.value = this.templateName;
 		select.onchange = () => {

@@ -382,7 +382,13 @@ export default class PickmePlugin extends Plugin {
 			new Notice(t('pickme：找不到源文档 {v0}', { v0: sourcePath }));
 			return;
 		}
-		await this.app.workspace.getLeaf(false).openFile(file);
+		// 同一个文件已经开着就只切过去，不再 openFile：
+		// 重复打开会让阅读器整个重载（看起来像页面刷新），也会连带重建索引列表
+		const opened = [...this.app.workspace.getLeavesOfType('markdown'), ...this.app.workspace.getLeavesOfType(VIEW_TYPE_PICKME_PDF)].find(
+			(leaf) => (leaf.view as { file?: TFile | null }).file?.path === file.path,
+		);
+		if (opened) await this.app.workspace.revealLeaf(opened);
+		else await this.app.workspace.getLeaf(false).openFile(file);
 		await this.jumpToAnchor(id, file);
 	}
 
@@ -803,7 +809,7 @@ export default class PickmePlugin extends Plugin {
 					apiKey: this.settings.apiKey,
 					model,
 					temperature: template?.config.temperature ?? this.settings.temperature,
-					system: buildSystemPrompt(withContext),
+					system: buildSystemPrompt(withContext, params.question),
 					user: userPrompt,
 					images,
 					history: buildHistoryMessages(entry.qas.slice(0, index)),

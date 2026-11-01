@@ -105,7 +105,12 @@ export const EN: Record<string, string> = {
 	'pickme：已新建模板「{v0}」，文件名就是模板名，正文就是提示词':
 		'Pick Me: created template "{v0}". The file name is the template name; the body is the prompt.',
 	'从接口拉取': 'Fetch from API',
-	'你是一个中文技术助手，正在为阅读中的文档做批注。回答要具体、可核对，不要重复原文，不要编造原文里没有的信息。': 'You are a Chinese-language technical assistant annotating a document the user is reading. Answers must be specific and verifiable, do not repeat the source text, and do not invent information that is not in it.',
+	'你是一个技术助手，正在为阅读中的文档做批注。回答要具体、可核对，不要重复原文，不要编造原文里没有的信息。': 'You are a technical assistant annotating a document the user is reading. Answers must be specific and verifiable, do not repeat the source text, and do not invent information that is not in it.',
+	'请用中文回答。': 'Answer in Chinese.',
+	'请用英文回答。': 'Answer in English.',
+	'解释': 'Explain',
+	'摘要': 'Summarize',
+	'翻译': 'Translate',
 	'侧边栏可选模型': 'Models in the sidebar',
 	'保存区域截图': 'Save region screenshots',
 	'保存在本机插件配置里，不会随库同步。': 'Stored in this device\\\'s plugin configuration; not synced with the vault.',
@@ -348,6 +353,17 @@ export function setLanguage(language: string | undefined): void {
  * 图标按钮的标签要跟着语言变（渲染时按当前语言取），调用点上放的是待翻译的原中文，
  * 用这个函数包一层，i18n 的覆盖检查单测才认得出这些 key。
  */
+/**
+ * 内置模板名按界面语言显示（提问面板的下拉、设置页的模板清单都用它）。
+ * 自定义模板原样返回——文件名叫什么就显示什么。
+ */
+export function templateLabel(name: string): string {
+	if (name === '解释') return t('解释');
+	if (name === '摘要') return t('摘要');
+	if (name === '翻译') return t('翻译');
+	return name;
+}
+
 export function tKey(zh: string): string {
 	return zh;
 }

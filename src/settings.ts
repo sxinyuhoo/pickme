@@ -1,6 +1,6 @@
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 import type { SettingDefinitionItem } from 'obsidian';
-import { LANGUAGE_LABELS, setLanguage, t } from './i18n.ts';
+import { LANGUAGE_LABELS, setLanguage, t, templateLabel } from './i18n.ts';
 import type { Language } from './i18n.ts';
 import type PickmePlugin from './main.ts';
 import type { ChatTransport } from './model/client.ts';
@@ -303,7 +303,7 @@ export class PickmeSettingTab extends PluginSettingTab {
 								}
 								for (const name of names) {
 									new Setting(host)
-										.setName(name)
+										.setName(templateLabel(name))
 										.setDesc(builtin.includes(name) ? t('内置模板') : '')
 										.addToggle((toggle) =>
 											toggle

@@ -2,7 +2,7 @@
 
 import { requestUrl } from 'obsidian';
 import type { RequestUrlResponse } from 'obsidian';
-import { t } from '../i18n.ts';
+import { currentLanguage, t } from '../i18n.ts';
 
 export interface ChatImage {
 	/** data url */
@@ -453,8 +453,21 @@ export async function listModels(
 	return parse(await response.json());
 }
 
-export function buildSystemPrompt(withContext: boolean): string {
-	// 跟随界面语言：英文界面下模型也用英文作答
-	const base = t('你是一个中文技术助手，正在为阅读中的文档做批注。回答要具体、可核对，不要重复原文，不要编造原文里没有的信息。');
-	return withContext ? `${base} ${t('用户会给出选区，可能还有上下文片段。')}` : base;
+/**
+ * 回答语言里提到别的语言时就不再强加：用户明确说了「翻译成英文」「answer in Japanese」时，
+ * 我们只负责别把界面语言当默认值盖上去。
+ */
+const EXPLICIT_LANGUAGE = /(中文|汉语|简体|繁体|英文|英语|日文|日语|韩文|韩语|法文|法语|德文|德语|西班牙文|西班牙语|俄文|俄语|翻译成|译成|translate\s+(?:in)?to|in\s+(?:chinese|english|japanese|korean|french|german|spanish|russian)|answer\s+in|respond\s+in|reply\s+in)/i;
+
+/**
+ * 系统提示：跟随界面语言，并显式交代回答语言。
+ * 之前英文界面下写的是「你是中文助手」，模型于是默认用中文回答——那是个 bug。
+ */
+export function buildSystemPrompt(withContext: boolean, question = ''): string {
+	const base = t('你是一个技术助手，正在为阅读中的文档做批注。回答要具体、可核对，不要重复原文，不要编造原文里没有的信息。');
+	const parts = [base];
+	if (withContext) parts.push(t('用户会给出选区，可能还有上下文片段。'));
+	// 用户自己在问题里指定了语言就听他的
+	if (!EXPLICIT_LANGUAGE.test(question)) parts.push(currentLanguage() === 'zh' ? t('请用中文回答。') : t('请用英文回答。'));
+	return parts.join(' ');
 }
