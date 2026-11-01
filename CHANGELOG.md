@@ -2,6 +2,13 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.2.2
+
+- 修「便利贴批注点击不闪烁」：闪烁规则漏了便利贴这一种标注（只覆盖了行带、框、页码标签）
+- 闪烁等标记真正画出来之后再闪（翻页重绘期间元素尺寸为 0 时不算到位），新建出来的阅读器会先切到前台再闪
+- 闪烁更明显：描边 3px、偏移 2px
+- 修社区扫描器的报错：styles.css 里一个空规则（选择器以逗号结尾、没有声明块）、设置页两处内联样式改为 CSS 类、`createEl('span')` 改用 `createSpan`、全局 fetch 引用收敛成一处显式入口
+
 ## 1.2.1
 
 - 从批注索引点进某条批注也会闪烁定位了（PDF 冷启动要等渲染，重试窗口从 1.2 秒放宽到 6 秒）

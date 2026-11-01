@@ -1637,12 +1637,14 @@ body.pickme-mark-border .pickme-mark {
 	display: block;
 }
 
+/* 三种标注都要能闪：行带、框、便利贴、页码标签（便利贴以前漏了，点了没反应） */
 .pickme-pdf-mark.is-flash .pickme-pdf-band,
 .pickme-pdf-mark.is-flash .pickme-pdf-box,
+.pickme-pdf-mark.is-flash .pickme-pdf-sticky,
 .pickme-pdf-mark.is-flash .pickme-pdf-label {
-	outline: 2px solid transparent;
-	outline-offset: 1px;
-	animation: pickme-flash 0.42s ease-in-out 2;
+	outline: 3px solid transparent;
+	outline-offset: 2px;
+	animation: pickme-flash 0.45s ease-in-out 2;
 }
 
 /* 正文里的标记：同样的两次呼吸，不改变它自己的底色/下划线样式 */
@@ -1658,7 +1660,7 @@ body.pickme-mark-border .pickme-mark {
 	100% {
 		outline-color: transparent;
 	}
-	50% {
+	45% {
 		outline-color: var(--pk-acc);
 	}
 }
@@ -1808,9 +1810,17 @@ body.pickme-mark-border .pickme-mark {
 	.pickme-index *,
 	.pickme-pdf *,
 	.pickme-panel *,
-	.pickme-mark,
+	.pickme-mark {
+		transition: none !important;
+	}
 }
 
+
+/* 设置页里需要纵向铺满的那一行（模板清单） */
+.pickme-setting-stack {
+	flex-direction: column;
+	align-items: stretch;
+}
 
 /* 标注方式选中态：底色 + 内描边 + 图标同色，三重确认当前模式 */
 .pickme-pdf-toolbar .pickme-icon-button.is-active {

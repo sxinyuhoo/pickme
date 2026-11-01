@@ -851,14 +851,23 @@ export default class PickmePlugin extends Plugin {
 	private flashEntry(id: string, file: TFile, attempt = 0): void {
 		const selector = `[data-pickme-id="${CSS.escape(id)}"]`;
 		const found: HTMLElement[] = [];
+		const visible = (el: HTMLElement) => {
+			const rect = el.getBoundingClientRect();
+			return rect.width > 0 && rect.height > 0;
+		};
 		const pdf = this.pdfViewFor(file.path);
 		if (pdf) {
-			pdf.leaf.view.containerEl.querySelectorAll<HTMLElement>(selector).forEach((el) => found.push(el));
+			// 翻页之后 slot 要重新画：元素在 DOM 里但尺寸为 0 时不算「到位」，继续等
+			pdf.leaf.view.containerEl.querySelectorAll<HTMLElement>(selector).forEach((el) => {
+				if (visible(el)) found.push(el);
+			});
 		}
 		for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
 			const view = leaf.view;
 			if (!(view instanceof MarkdownView) || view.file?.path !== file.path) continue;
-			view.containerEl.querySelectorAll<HTMLElement>(`.pickme-mark${selector}`).forEach((el) => found.push(el));
+			view.containerEl.querySelectorAll<HTMLElement>(`.pickme-mark${selector}`).forEach((el) => {
+				if (visible(el)) found.push(el);
+			});
 		}
 		if (found.length === 0) {
 			// 冷启动要等：从索引点进来时，视图可能刚创建、页面还没画完（实测最长 ~3 秒）
@@ -898,6 +907,7 @@ export default class PickmePlugin extends Plugin {
 			if (this.settings.pdfViewerEnabled) {
 				await this.openPdfInPickmeView(target);
 				const created = this.pdfViewFor(target.path);
+				if (created) await this.app.workspace.revealLeaf(created.leaf);
 				await created?.focusEntry(id);
 				this.flashEntry(id, target);
 				return;

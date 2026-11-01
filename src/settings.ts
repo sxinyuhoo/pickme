@@ -288,9 +288,8 @@ export class PickmeSettingTab extends PluginSettingTab {
 						desc: t('勾上就在提问面板的下拉里出现；取消勾选只是藏起来，文件不删。新建的模板排在最后。'),
 						aliases: ['templates', 'template list'],
 						render: (setting) => {
-							// 清单比一行宽，把这一行改成纵向排列，让下面的列表铺满
-							setting.settingEl.style.flexDirection = 'column';
-							setting.settingEl.style.alignItems = 'stretch';
+							// 清单比一行宽，把这一行改成纵向排列，让下面的列表铺满（样式走 CSS 类，别写内联）
+							setting.settingEl.addClass('pickme-setting-stack');
 							const host = setting.settingEl.createDiv({ cls: 'pickme-template-list' });
 							void (async () => {
 								const builtin = this.plugin.templates.builtinNames();

@@ -270,7 +270,7 @@ export class PickmeIndexView extends ItemView {
 
 		// 选择模式：行最左侧一个勾选框，点它或点整行都切换这一条
 		if (this.selecting) {
-			const check = row.createEl('span', { cls: 'pickme-index-check' });
+			const check = row.createSpan({ cls: 'pickme-index-check' });
 			check.setAttribute('role', 'checkbox');
 			check.setAttribute('aria-checked', this.picked.has(key) ? 'true' : 'false');
 			check.setAttribute('tabindex', '-1');
