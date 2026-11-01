@@ -232,13 +232,40 @@ export class PickmePdfView extends FileView {
 		const mark = slot?.overlay.querySelector(`[data-pickme-id="${id}"]`);
 		const ready = slot ? slot.rendered || slot.failed : false;
 		if (mark instanceof HTMLElement && ready) {
-			mark.scrollIntoView({ block: 'center', behavior: 'smooth' });
-			mark.addClass('is-flash');
-			window.setTimeout(() => mark.removeClass('is-flash'), 1100);
+			this.flashMark(mark);
 			return;
 		}
 		// 最多等 6 秒（每 200ms 一次）：冷启动时渲染队列可能排在后面
 		if (attempt < 30) window.setTimeout(() => this.flashWhenRendered(id, slot, attempt + 1), 200);
+	}
+
+	/** 闪两下。先摘类再强制重排，否则连点同一条时第二次不会重新播动画 */
+	private flashMark(mark: HTMLElement): void {
+		mark.scrollIntoView({ block: 'center', behavior: 'smooth' });
+		mark.removeClass('is-flash');
+		void mark.offsetWidth;
+		mark.addClass('is-flash');
+		window.setTimeout(() => mark.removeClass('is-flash'), 1100);
+		// 真正闪出来了才把请求摘掉：视图万一被换掉，请求还留给下一个实例兑现
+		if (this.plugin.pendingFlash?.id === mark.getAttribute('data-pickme-id')) this.plugin.pendingFlash = null;
+	}
+
+	/**
+	 * 渲染完一页之后兑现「待闪烁」请求。
+	 * 从索引点进来时视图可能才刚创建：主进程挂上请求，谁先把这页画出来谁负责闪。
+	 */
+	private consumePendingFlash(slot: PageSlot): void {
+		const pending = this.plugin.pendingFlash;
+		if (!pending || pending.filePath !== this.file?.path) return;
+		if (Date.now() > pending.until) {
+			this.plugin.pendingFlash = null;
+			return;
+		}
+		if (!slot.rendered && !slot.failed) return;
+		const mark = slot.overlay.querySelector<HTMLElement>(`[data-pickme-id="${pending.id}"]`);
+		if (!mark) return;
+		this.plugin.pendingFlash = null;
+		this.flashMark(mark);
 	}
 
 	/**
@@ -825,6 +852,7 @@ export class PickmePdfView extends FileView {
 				}
 			}
 			await this.drawMarksFor(slot);
+			this.consumePendingFlash(slot);
 		} catch (error) {
 			slot.failed = true;
 			const message = error instanceof Error ? error.message : String(error);

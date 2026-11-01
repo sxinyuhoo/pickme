@@ -844,6 +844,13 @@ export default class PickmePlugin extends Plugin {
 
 	/** 跳到锚点在原文里的位置并选中 */
 	/**
+	 * 待兑现的闪烁请求。
+	 * 从索引点进来时阅读器视图可能刚在创建（翻页、渲染都在后面），
+	 * 这时候谁都无法立刻闪——把请求挂在这里，让视图画完那一页之后自己兑现。
+	 */
+	pendingFlash: { id: string; filePath: string; until: number } | null = null;
+
+	/**
 	 * 跳到批注之后让它闪两下。
 	 * 同一页批注一多，光靠选区很难一眼找到位置；闪两下是最省事的定位手段。
 	 * PDF 的标记是异步画出来的（翻页后要等渲染），所以要重试几次直到元素出现。
@@ -892,6 +899,8 @@ export default class PickmePlugin extends Plugin {
 				new Notice(t('pickme：找不到批注 {v0}', { v0: id }));
 				return;
 			}
+			// 先把「待闪烁」挂上：视图可能是新建的，画完那一页由它自己兑现
+			this.pendingFlash = { id, filePath: target.path, until: Date.now() + 8000 };
 			const openView = this.pdfViewFor(target.path);
 			if (openView) {
 				await this.app.workspace.revealLeaf(openView.leaf);
@@ -900,9 +909,16 @@ export default class PickmePlugin extends Plugin {
 			}
 			if (this.settings.pdfViewerEnabled) {
 				await this.openPdfInPickmeView(target);
-				const created = this.pdfViewFor(target.path);
-				if (created) await this.app.workspace.revealLeaf(created.leaf);
-				await created?.focusEntry(id);
+				// openPdfInPickmeView 返回时视图往往还没建完，等一下再交给它
+				for (let attempt = 0; attempt < 30; attempt++) {
+					const created = this.pdfViewFor(target.path);
+					if (created) {
+						await this.app.workspace.revealLeaf(created.leaf);
+						await created.focusEntry(id);
+						return;
+					}
+					await new Promise((resolve) => window.setTimeout(resolve, 200));
+				}
 				return;
 			}
 			const pdfLeaf = this.app.workspace.getLeaf(false);
