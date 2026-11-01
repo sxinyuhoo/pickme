@@ -206,71 +206,41 @@ export class PickmePdfView extends FileView {
 		this.setAnnotateMode('area');
 	}
 
-	/** 跳到某条批注：滚到对应页并闪一下它的框 */
+	/** 跳到某条批注：需要的话滚到对应页，然后闪两下 */
 	async focusEntry(id: string): Promise<void> {
 		const file = this.file;
 		if (!file) return;
 		const doc = await this.plugin.loadDoc(file);
 		const entry = doc.entries.find((item) => item.id === id);
 		if (!entry?.pdf) return;
-		const slot = this.slots[entry.pdf.page - 1];
-		if (slot) {
-			this.scrollToPage(entry.pdf.page);
-			// 目标页可能还没画，先把渲染排到队首
-			this.queueRenders([slot], true);
-		}
-		// 等这一页真正画完再闪：页面还白着的时候闪，等于没闪
-		this.flashWhenRendered(id, slot ?? null, 0);
+		await this.flashVisual(entry);
 	}
 
 	/**
-	 * 等目标页渲染完成再闪两下。
-	 * 从索引点进来时视图是新建的：标记元素会立刻出现在 DOM 里（绝对定位，尺寸不为 0），
-	 * 但下面的画布还是白的——这时候闪用户根本看不到，所以要盯 slot.rendered。
+	 * 把一条批注「闪两下」。
+	 *
+	 * 这里刻意**不**给常驻标记加类：标记会随重绘被替换，类加在一个已经脱离文档的节点上，
+	 * 用户就什么都看不见（这正是「点了没反应」的根源之一）。改成在 overlay 上独立画一个
+	 * 临时框：只活一秒多，页面/标记怎么重绘都不影响它，也不碰任何数据。
 	 */
-	private flashWhenRendered(id: string, slot: PageSlot | null, attempt: number): void {
-		const mark = slot?.overlay.querySelector(`[data-pickme-id="${id}"]`);
-		const ready = slot ? slot.rendered || slot.failed : false;
-		if (mark instanceof HTMLElement && ready) {
-			this.flashMark(mark);
-			return;
-		}
-		// 最多等 6 秒（每 200ms 一次）：冷启动时渲染队列可能排在后面
-		if (attempt < 30) window.setTimeout(() => this.flashWhenRendered(id, slot, attempt + 1), 200);
-	}
-
-	/** 闪两下。先摘类再强制重排，否则连点同一条时第二次不会重新播动画 */
-	private flashMark(mark: HTMLElement): void {
-		mark.scrollIntoView({ block: 'center', behavior: 'smooth' });
-		// 等跳转/滚动落定再闪，否则闪烁会被同时发生的位置变化盖掉
-		window.setTimeout(() => {
-			mark.removeClass('is-flash');
-			void mark.offsetWidth;
-			mark.addClass('is-flash');
-		}, 150);
-		window.setTimeout(() => mark.removeClass('is-flash'), 1100);
-		// 真正闪出来了才把请求摘掉：视图万一被换掉，请求还留给下一个实例兑现
-		if (this.plugin.pendingFlash?.id === mark.getAttribute('data-pickme-id')) this.plugin.pendingFlash = null;
-	}
-
-	/**
-	 * 批注不在当前文档的批注文件里时（批注文件记的源路径过期、两边文件又都存在，没法自动搬），
-	 * 临时按几何信息画一个框闪两下——只做视觉定位，不碰任何数据。
-	 */
-	async flashDetachedEntry(entry: AnnotationEntry): Promise<void> {
+	async flashVisual(entry: AnnotationEntry): Promise<void> {
 		const pdf = entry.pdf;
-		if (!pdf) return;
+		if (!pdf || !this.slots.length) return;
+		const page = Math.min(Math.max(1, pdf.page), this.slots.length);
 		for (let attempt = 0; attempt < 30; attempt++) {
-			const slot = this.slots[pdf.page - 1];
-			if (slot && !slot.rendered && !slot.rendering) {
-				// 这一页可能还没画（甚至被释放过）：先滚过去，再把它排到渲染队首
-				this.scrollToPage(pdf.page);
-				this.queueRenders([slot], true);
+			const slot = this.slots[page - 1];
+			if (!slot) return;
+			// 目标页已经看得见就别滚 —— 否则同一页上的批注点一次跳一次，像在重新载入
+			if (!this.pageInViewport(page)) {
+				this.scrollToPage(page);
+				await new Promise((resolve) => window.requestAnimationFrame(() => resolve(null)));
 			}
-			if (slot && (slot.rendered || slot.failed)) {
+			// 这一页还没画（或被释放过）就把它排到渲染队首，等它画完再闪
+			if (!slot.rendered && !slot.rendering) this.queueRenders([slot], true);
+			if (slot.rendered || slot.failed) {
 				const size = this.slotSize(slot);
 				const outer = pdfToScreenRect(pdf.rect, size, pdf.pageSize, pdf.rotation ?? 0);
-				const ghost = slot.overlay.createDiv({ cls: 'pickme-pdf-mark pickme-pdf-ghost' });
+				const ghost = slot.overlay.createDiv({ cls: 'pickme-pdf-ghost pickme-pdf-flash' });
 				ghost.setAttribute('data-pickme-id', entry.id);
 				ghost.setCssProps({
 					left: `${outer[0]}px`,
@@ -279,12 +249,37 @@ export class PickmePdfView extends FileView {
 					height: `${Math.max(6, outer[3] - outer[1])}px`,
 				});
 				ghost.createDiv({ cls: 'pickme-pdf-box' });
-				ghost.addClass('is-flash');
-				window.setTimeout(() => ghost.remove(), 1100);
+				const view = this.scrollEl?.getBoundingClientRect();
+				const here = ghost.getBoundingClientRect();
+				if (view && (here.top < view.top || here.bottom > view.bottom)) {
+					ghost.scrollIntoView({ block: 'center', behavior: 'smooth' });
+				}
+				window.setTimeout(() => ghost.remove(), 1200);
+				// 闪出来了才把「待闪烁」请求摘掉
+				if (this.plugin.pendingFlash?.id === entry.id) this.plugin.pendingFlash = null;
 				return;
 			}
 			await new Promise((resolve) => window.setTimeout(resolve, 200));
 		}
+	}
+
+	/** 按 id 闪（找不到就不闪） */
+	async flashVisualById(id: string): Promise<void> {
+		const file = this.file;
+		if (!file) return;
+		const doc = await this.plugin.loadDoc(file);
+		const entry = doc.entries.find((item) => item.id === id);
+		if (entry?.pdf) await this.flashVisual(entry);
+	}
+
+	/** 某一页是否落在滚动视口里（留一点余量，避免页边贴线时反复滚） */
+	private pageInViewport(page: number): boolean {
+		const scroll = this.scrollEl;
+		const slot = this.slots[page - 1];
+		if (!scroll || !slot) return false;
+		const view = scroll.getBoundingClientRect();
+		const sheet = slot.sheet.getBoundingClientRect();
+		return sheet.bottom > view.top + 16 && sheet.top < view.bottom - 16;
 	}
 
 	/**
@@ -299,10 +294,8 @@ export class PickmePdfView extends FileView {
 			return;
 		}
 		if (!slot.rendered && !slot.failed) return;
-		const mark = slot.overlay.querySelector<HTMLElement>(`[data-pickme-id="${pending.id}"]`);
-		if (!mark) return;
-		this.plugin.pendingFlash = null;
-		this.flashMark(mark);
+		// 这一页画完了：按几何信息闪一次（不再依赖常驻标记，重绘不会把闪烁冲掉）
+		void this.flashVisualById(pending.id);
 	}
 
 	/**

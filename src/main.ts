@@ -889,13 +889,9 @@ export default class PickmePlugin extends Plugin {
 			const pending = this.pendingFlash;
 			if (!pending || pending.id !== id || pending.filePath !== file.path) return; // 已经闪过了
 			const view = this.pdfViewFor(file.path);
-			const mark = view?.leaf.view.containerEl.querySelector<HTMLElement>(`[data-pickme-id="${CSS.escape(id)}"]`);
-			if (!mark) return;
+			if (!view) return;
 			this.pendingFlash = null;
-			mark.removeClass('is-flash');
-			void mark.offsetWidth;
-			mark.addClass('is-flash');
-			window.setTimeout(() => mark.removeClass('is-flash'), 1100);
+			void view.flashVisualById(id);
 		}, 1800);
 	}
 
@@ -973,7 +969,7 @@ export default class PickmePlugin extends Plugin {
 			const openView = this.pdfViewFor(target.path);
 			if (openView) {
 				await this.app.workspace.revealLeaf(openView.leaf);
-				if (detached) await openView.flashDetachedEntry(pdfEntry);
+				if (detached) await openView.flashVisual(pdfEntry);
 				else await openView.focusEntry(id);
 				if (!detached) this.armFlashFallback(id, target);
 				return;
@@ -985,7 +981,7 @@ export default class PickmePlugin extends Plugin {
 					const created = this.pdfViewFor(target.path);
 					if (created) {
 						await this.app.workspace.revealLeaf(created.leaf);
-						if (detached) await created.flashDetachedEntry(pdfEntry);
+						if (detached) await created.flashVisual(pdfEntry);
 						else await created.focusEntry(id);
 						if (!detached) this.armFlashFallback(id, target);
 						return;

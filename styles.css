@@ -1812,9 +1812,17 @@ body.pickme-mark-border .pickme-mark {
 }
 
 
-/* 源路径过期的批注：临时闪一个框（不是常驻标记，别拦鼠标） */
+/* 定位闪烁用的临时框：独立绘制、不吃鼠标事件，活一秒多就自己消失 */
 .pickme-pdf-ghost {
 	pointer-events: none;
+}
+
+.pickme-pdf-flash > .pickme-pdf-box {
+	border-color: transparent;
+	background: transparent;
+	outline: 2px solid transparent;
+	outline-offset: 2px;
+	animation: pickme-flash 0.42s ease-in-out 2;
 }
 
 /* 设置页里需要纵向铺满的那一行（模板清单） */
