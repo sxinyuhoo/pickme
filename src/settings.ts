@@ -53,6 +53,8 @@ export interface PickmeSettings {
 	pdfTocOpen: boolean;
 	/** PDF 页面上是否画出已有批注的高亮框（关掉就是原始 PDF 的样子） */
 	showMarks: boolean;
+	/** 批注索引里是否列出「锚点丢失」的批注（关掉就只剩有效的，失效的仍留在文件里） */
+	showStaleInIndex: boolean;
 	/** PDF 标注方式：荧光笔（拖一笔吸附到文字行）/ 框选（拖一块区域）/ 便利贴（点一下放图标） */
 	pdfAnnotateMode: PdfAnnotateMode;
 	/** 框选时保存区域截图 */
@@ -113,6 +115,7 @@ export const DEFAULT_SETTINGS: PickmeSettings = {
 	pdfLastPage: {},
 	pdfTocOpen: true,
 	showMarks: true,
+	showStaleInIndex: true,
 	pdfAnnotateMode: 'highlight',
 	pdfSaveScreenshot: true,
 	pdfScreenshotMaxSize: 1200,
@@ -633,6 +636,18 @@ export class PickmeSettingTab extends PluginSettingTab {
 						},
 					},
 					{
+						name: t('索引里显示「锚点丢失」的批注'),
+						desc: t(
+							'原文改动后锚点找不回的批注不会删，只会在索引里收成一条可展开的记录。不想看到它们就关掉——批注仍在批注文件里，随时可以打开这个开关或用「重新绑定失效锚点」救回。',
+						),
+						aliases: ['stale', 'broken anchor', 'index'],
+						control: {
+							type: 'toggle',
+							key: 'showStaleInIndex',
+							defaultValue: DEFAULT_SETTINGS.showStaleInIndex,
+						},
+					},
+					{
 						name: t('视觉标记样式'),
 						desc: t('阅读视图里批注范围怎么标出来。'),
 						aliases: ['mark style', 'appearance'],
@@ -746,6 +761,12 @@ export class PickmeSettingTab extends PluginSettingTab {
 			}
 			case 'inlineAsk': {
 				settings.inlineAsk = Boolean(value);
+				await this.plugin.saveSettings();
+				await this.plugin.refreshViews();
+				return;
+			}
+			case 'showStaleInIndex': {
+				settings.showStaleInIndex = Boolean(value);
 				await this.plugin.saveSettings();
 				await this.plugin.refreshViews();
 				return;

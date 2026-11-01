@@ -861,8 +861,8 @@ export default class PickmePlugin extends Plugin {
 			view.containerEl.querySelectorAll<HTMLElement>(`.pickme-mark${selector}`).forEach((el) => found.push(el));
 		}
 		if (found.length === 0) {
-			// 最多等 1.2 秒：翻页后的渲染队列走完才能取到标记
-			if (attempt < 6) window.setTimeout(() => this.flashEntry(id, file, attempt + 1), 200);
+			// 冷启动要等：从索引点进来时，视图可能刚创建、页面还没画完（实测最长 ~3 秒）
+			if (attempt < 30) window.setTimeout(() => this.flashEntry(id, file, attempt + 1), 200);
 			return;
 		}
 		for (const el of found) {

@@ -79,9 +79,17 @@ export class PickmeIndexView extends ItemView {
 	}
 
 	private totals(): { entries: number; files: number } {
+		const countStale = this.showStale();
 		let entries = 0;
-		for (const group of this.groups) entries += group.entries.length;
+		for (const group of this.groups) {
+			entries += countStale ? group.entries.length : group.entries.filter((entry) => entry.status === 'ok').length;
+		}
 		return { entries, files: this.groups.length };
+	}
+
+	/** 是否在索引里列出「锚点丢失」的批注（设置项，默认开） */
+	private showStale(): boolean {
+		return this.plugin.settings.showStaleInIndex !== false;
 	}
 
 	/** 过滤只看「命中的条目」，文档名命中时整篇都留 */
@@ -209,13 +217,15 @@ export class PickmeIndexView extends ItemView {
 					void this.openSource(group);
 				}
 			};
-			head.createSpan({ cls: 'pickme-count', text: t('{v0} 条', { v0: group.entries.length }) });
+			const shown = this.showStale() ? group.entries.length : group.entries.filter((entry) => entry.status === 'ok').length;
+			head.createSpan({ cls: 'pickme-count', text: t('{v0} 条', { v0: shown }) });
 
-			// 有效的照常列出；失效的默认折起来，免得看着像一堆坏数据
+			// 有效的照常列出；失效的默认折起来，免得看着像一堆坏数据。
+			// 「索引里显示锚点丢失的批注」关掉后整段不渲染（数据仍在批注文件里，不会丢）
 			const live = group.entries.filter((entry) => entry.status === 'ok');
 			const stale = group.entries.filter((entry) => entry.status !== 'ok');
 			for (const entry of live) this.renderEntry(card, group, entry);
-			if (stale.length > 0) this.renderStale(card, group, stale);
+			if (this.showStale() && stale.length > 0) this.renderStale(card, group, stale);
 		}
 	}
 
@@ -226,7 +236,7 @@ export class PickmeIndexView extends ItemView {
 		toggle.setAttribute('tabindex', '0');
 		toggle.setAttribute('role', 'button');
 		toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-		const toggleText = t('失效（{v0}）', { v0: stale.length });
+		const toggleText = t('锚点丢失（{v0}）', { v0: stale.length });
 		toggle.setText(`${expanded ? '▾' : '▸'} ${toggleText}`);
 		toggle.setAttribute('title', t('这些批注的锚点在原文里找不到了，点开查看'));
 		const flip = () => {
