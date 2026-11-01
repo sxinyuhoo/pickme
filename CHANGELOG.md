@@ -2,6 +2,11 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.2.10
+
+- 修「闪烁只在框的左上角冒一个圆点」：临时框里那层子元素是绝对定位，没给 inset 就塌成 0×0，描边只能画出左上角一个点；补上 `inset: 0` 之后整块区域一起闪
+- 冷启动（文件还没打开时）第一次点击就会正确闪烁，不再需要点第二次
+
 ## 1.2.9
 
 - 修「闪烁只出现在页面左上角的一个小圆点」：定位闪烁用的临时框自己带 `position: absolute` 才能用 left/top 定位，之前漏了，于是框一直蹲在页面左上角（1.2.8 引入）

@@ -1820,7 +1820,11 @@ body.pickme-mark-border .pickme-mark {
 	pointer-events: none;
 }
 
+/* 内层这个框必须自己铺满临时框：
+   它是 absolute 定位，不给 inset 就塌成 0×0，描边只在左上角画出一个圆点
+   （看起来像「闪烁只闪了一个点」） */
 .pickme-pdf-flash > .pickme-pdf-box {
+	inset: 0;
 	border-color: transparent;
 	background: transparent;
 	outline: 2px solid transparent;
