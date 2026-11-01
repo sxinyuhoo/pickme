@@ -273,6 +273,26 @@ export class PickmePdfView extends FileView {
 	}
 
 	/**
+	 * 悬停更新「当前批注」（浏览态）。
+	 * 取指针正下方最上面那个「形状」所属的批注：框盖着荧光带时，
+	 * 停在框上就是框、停在没被盖住的荧光带上就是荧光带——和眼睛看到的层次一致。
+	 */
+	private updateHover(slot: PageSlot, event: PointerEvent): void {
+		if (this.plugin.settings.pdfAnnotateMode !== 'none') {
+			if (this.hoverEntryId === null) return;
+		}
+		const top = this.pickByPriority(this.marksAt(slot, event, null))[0] ?? null;
+		const id = top?.getAttribute('data-pickme-id') ?? null;
+		if (id === this.hoverEntryId) return;
+		this.hoverEntryId = id;
+		for (const page of this.slots) {
+			for (const mark of page.overlay.querySelectorAll<HTMLElement>('.pickme-pdf-mark')) {
+				mark.toggleClass('is-hover', id !== null && mark.getAttribute('data-pickme-id') === id);
+			}
+		}
+	}
+
+	/**
 	 * 这一点上盖着的所有批注，从最上层到最下层。
 	 * 用 elementsFromPoint 而不是 event.target：后者只给最上面的那一个，
 	 * 叠在一起时下面的就永远点不到了。
@@ -294,7 +314,9 @@ export class PickmePdfView extends FileView {
 	 * 不能只看「当前面板打开的那条」：面板一点外面就关了，下次再点又会从最上面开始，
 	 * 下面的那条永远轮不到。所以记住上一次在同一处点的是哪一条（同一点 5 秒内算同一轮）。
 	 */
-	private cyclePick(stack: HTMLElement[], event: PointerEvent): HTMLElement | null {
+	private cyclePick(raw: HTMLElement[], event: PointerEvent): HTMLElement | null {
+		// 循环顺序跟着「看到的层次」走，和悬停显示的那条保持一致
+		const stack = this.pickByPriority(raw);
 		if (stack.length === 0) return null;
 		if (stack.length === 1) {
 			this.stackPick = null;
@@ -306,6 +328,23 @@ export class PickmePdfView extends FileView {
 		const next = sameRound ? (prev.at + 1) % stack.length : 0;
 		this.stackPick = { x: event.clientX, y: event.clientY, ids, at: next, until: Date.now() + 5000 };
 		return stack[next];
+	}
+
+	/** 当前悬停命中的批注（浏览态） */
+	private hoverEntryId: string | null = null;
+
+	/**
+	 * 按「看到的层次」排序：便利贴（小图标，盖在最上）> 荧光带（文字级）> 框（区域级）。
+	 * 只按绘制顺序取最上面那个不行——框是一大块透明区域，会把它上面的荧光带盖住，
+	 * 于是指针停在荧光带上却选中了框（用户要的正好相反）。
+	 */
+	private pickByPriority(stack: HTMLElement[]): HTMLElement[] {
+		const rank = (mark: HTMLElement): number => {
+			if (mark.querySelector('.pickme-pdf-sticky')) return 3;
+			if (mark.querySelector('.pickme-pdf-band')) return 2;
+			return 1;
+		};
+		return [...stack].sort((a, b) => rank(b) - rank(a));
 	}
 
 	/** 上一次在某一处点开的是叠放里的哪一条（同一处连点就依次往下换） */
@@ -755,6 +794,13 @@ export class PickmePdfView extends FileView {
 			overlay.addEventListener('pointerdown', (event) => this.onPointerDown(slot, event));
 			overlay.addEventListener('pointermove', (event) => this.onPointerMove(slot, event));
 			overlay.addEventListener('pointerup', (event) => void this.onPointerUp(slot, event));
+			overlay.addEventListener('pointerleave', () => {
+				if (this.hoverEntryId === null) return;
+				this.hoverEntryId = null;
+				for (const page of this.slots) {
+					for (const mark of page.overlay.querySelectorAll<HTMLElement>('.pickme-pdf-mark.is-hover')) mark.removeClass('is-hover');
+				}
+			});
 			overlay.addEventListener('pointercancel', () => {
 				this.pendingMarkId = null;
 				this.resetDrag();
@@ -1204,7 +1250,11 @@ export class PickmePdfView extends FileView {
 			this.dragStickyPreview(slot, event);
 			return;
 		}
-		if (!this.dragStart || this.dragSlot !== slot) return;
+		if (!this.dragStart || this.dragSlot !== slot) {
+			// 没在拖：浏览态下跟着指针更新「当前批注」
+			this.updateHover(slot, event);
+			return;
+		}
 		const point = this.relativePoint(slot, event);
 		if (this.plugin.settings.pdfAnnotateMode === 'highlight') {
 			this.strokePoints.push(point);

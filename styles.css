@@ -1558,6 +1558,10 @@ body.pickme-mark-border .pickme-mark {
 /* 荧光行：像荧光笔压过纸面，正片叠底让文字透出来 */
 .pickme-pdf-band {
 	position: absolute;
+	/* 层级：荧光带在最下、框在其上、便利贴再上、标签最上。
+	   正片叠底只该跟「纸面 + 文字」相乘；如果框画在带子下面，
+	   带子会把框一起乘暗（叠在一起的那块会明显发深）。 */
+	z-index: 1;
 	background: color-mix(in srgb, var(--pk-hi) 40%, transparent);
 	mix-blend-mode: multiply;
 	border-radius: 2px;
@@ -1569,6 +1573,7 @@ body.pickme-mark-border .pickme-mark {
 /* 框选：细描边、几乎不填充，和色带叠在一起也不会糊成一块 */
 .pickme-pdf-box {
 	position: absolute;
+	z-index: 2;
 	border: 1px solid color-mix(in srgb, var(--pk-acc) 62%, transparent);
 	background: color-mix(in srgb, var(--pk-acc) 5%, transparent);
 	border-radius: 2px;
@@ -1579,6 +1584,17 @@ body.pickme-mark-border .pickme-mark {
 
 .pickme-pdf-mark:hover .pickme-pdf-box {
 	border-color: color-mix(in srgb, var(--pk-acc) 90%, transparent);
+}
+
+/* 悬停到哪条，哪条就是「当前」：和正在读的那条用同一套视觉 */
+.pickme-pdf-mark.is-hover .pickme-pdf-band,
+.pickme-pdf-mark.is-hover .pickme-pdf-sticky,
+.pickme-pdf-mark.is-hover .pickme-pdf-box {
+	filter: brightness(1.02);
+}
+
+.pickme-pdf-overlay:has(.pickme-pdf-mark.is-hover) .pickme-pdf-mark:not(.is-hover) {
+	opacity: 0.28;
 }
 
 /* 正在读的那条完整显形，同页其它批注退到背景 */
@@ -1674,6 +1690,7 @@ body.pickme-mark-border .pickme-mark {
 /* 便利贴：页面上只留一个小图标，内容点开才看（有内容是实心，空的是虚线） */
 .pickme-pdf-sticky {
 	position: absolute;
+	z-index: 3;
 	inset: 0;
 	width: 100%;
 	height: 100%;
