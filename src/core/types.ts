@@ -14,7 +14,8 @@ export interface QA {
 }
 
 /** PDF 标注方式：荧光笔（拖一笔吸附到文字行）、框选，还是点一下落便利贴 */
-export type PdfAnnotateMode = 'highlight' | 'area' | 'note';
+/** 三种标注工具 + 不选工具的浏览态（浏览态下指针是普通箭头，点击批注看详情） */
+export type PdfAnnotateMode = 'none' | 'highlight' | 'area' | 'note';
 
 /** 一条 PDF 批注里的单个形状：框选 = area，荧光笔 = line，便利贴 = note */
 export type PdfShapeKind = 'area' | 'line' | 'note';

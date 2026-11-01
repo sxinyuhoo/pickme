@@ -272,6 +272,53 @@ export class PickmePdfView extends FileView {
 		if (entry?.pdf) await this.flashVisual(entry);
 	}
 
+	/**
+	 * 这一点上盖着的所有批注，从最上层到最下层。
+	 * 用 elementsFromPoint 而不是 event.target：后者只给最上面的那一个，
+	 * 叠在一起时下面的就永远点不到了。
+	 */
+	private marksAt(slot: PageSlot, event: PointerEvent, fallback: HTMLElement | null): HTMLElement[] {
+		const nodes: HTMLElement[] = [];
+		const stack = typeof document.elementsFromPoint === 'function' ? document.elementsFromPoint(event.clientX, event.clientY) : [];
+		for (const node of stack) {
+			const mark = (node as HTMLElement).closest?.('.pickme-pdf-mark');
+			if (mark instanceof HTMLElement && slot.overlay.contains(mark) && !nodes.includes(mark)) nodes.push(mark);
+		}
+		if (nodes.length === 0 && fallback) nodes.push(fallback);
+		return nodes;
+	}
+
+	/**
+	 * 在叠放的那几条里挑「下一条」。
+	 *
+	 * 不能只看「当前面板打开的那条」：面板一点外面就关了，下次再点又会从最上面开始，
+	 * 下面的那条永远轮不到。所以记住上一次在同一处点的是哪一条（同一点 5 秒内算同一轮）。
+	 */
+	private cyclePick(stack: HTMLElement[], event: PointerEvent): HTMLElement | null {
+		if (stack.length === 0) return null;
+		if (stack.length === 1) {
+			this.stackPick = null;
+			return stack[0];
+		}
+		const ids = stack.map((node) => node.getAttribute('data-pickme-id') ?? '');
+		const prev = this.stackPick;
+		const sameRound = prev !== null && Date.now() < prev.until && Math.abs(prev.x - event.clientX) < 12 && Math.abs(prev.y - event.clientY) < 12 && prev.ids.join() === ids.join();
+		const next = sameRound ? (prev.at + 1) % stack.length : 0;
+		this.stackPick = { x: event.clientX, y: event.clientY, ids, at: next, until: Date.now() + 5000 };
+		return stack[next];
+	}
+
+	/** 上一次在某一处点开的是叠放里的哪一条（同一处连点就依次往下换） */
+	private stackPick: { x: number; y: number; ids: string[]; at: number; until: number } | null = null;
+
+	/** 按批注 id 取形状词（只用于叠放提示文案） */
+	private shapeWordForId(slot: PageSlot, id: string): string {
+		const mark = slot.overlay.querySelector<HTMLElement>(`[data-pickme-id="${CSS.escape(id)}"]`);
+		const label = mark?.querySelector('.pickme-pdf-label')?.textContent ?? '';
+		const parts = label.split('·');
+		return parts.length > 1 ? parts[1].trim() : label.trim();
+	}
+
 	/** 某一页是否落在滚动视口里（留一点余量，避免页边贴线时反复滚） */
 	private pageInViewport(page: number): boolean {
 		const scroll = this.scrollEl;
@@ -352,6 +399,8 @@ export class PickmePdfView extends FileView {
 
 	/** 批注增删改后重画页面上的标记（删除批注时要把高亮一起收掉） */
 	async refreshMarks(): Promise<void> {
+		// 批注都藏起来了，还举着笔没有意义：自动回到普通指针
+		if (!this.plugin.settings.showMarks && this.plugin.settings.pdfAnnotateMode !== 'none') this.setAnnotateMode('none');
 		this.refreshMarkButton();
 		await this.drawAllMarks();
 	}
@@ -477,9 +526,10 @@ export class PickmePdfView extends FileView {
 		this.addToolbarSep(toolbar);
 
 		// 标注方式：荧光笔（拖一笔吸附到文字行）｜框选（拖出一块区域）
-		this.highlighterButton = this.iconButton(toolbar, 'highlighter', tKey('荧光笔批注'), () => this.setAnnotateMode('highlight'), 'pickme-pdf-mode');
-		this.areaButton = this.iconButton(toolbar, 'box-select', tKey('框选批注'), () => this.setAnnotateMode('area'), 'pickme-pdf-mode');
-		this.stickyButton = this.iconButton(toolbar, 'sticky-note', tKey('便利贴批注'), () => this.setAnnotateMode('note'), 'pickme-pdf-mode');
+		// 再点一下已激活的工具就取消选中，回到浏览态（此时指针是普通箭头，只用来读和点批注）
+		this.highlighterButton = this.iconButton(toolbar, 'highlighter', tKey('荧光笔批注'), () => this.toggleAnnotateMode('highlight'), 'pickme-pdf-mode');
+		this.areaButton = this.iconButton(toolbar, 'box-select', tKey('框选批注'), () => this.toggleAnnotateMode('area'), 'pickme-pdf-mode');
+		this.stickyButton = this.iconButton(toolbar, 'sticky-note', tKey('便利贴批注'), () => this.toggleAnnotateMode('note'), 'pickme-pdf-mode');
 		this.addToolbarSep(toolbar);
 
 		// 显示：高亮总开关（关掉就是原样的 PDF，只看内容时不被标记打扰）
@@ -620,6 +670,7 @@ export class PickmePdfView extends FileView {
 	/** 状态文案随标注方式变，切换方式时也用它提示操作 */
 	private readyStatusText(): string {
 		const mode = this.plugin.settings.pdfAnnotateMode;
+		if (mode === 'none') return t('浏览模式：点批注看详情；选一个工具即可开始标注');
 		if (mode === 'highlight') return t('拖一笔划过文字即可高亮；左右滑动翻页');
 		if (mode === 'note') return t('点一下页面任意位置放便利贴；左右滑动翻页');
 		return t('拖动框选提问；左右滑动翻页');
@@ -1094,10 +1145,19 @@ export class PickmePdfView extends FileView {
 
 	private onPointerDown(slot: PageSlot, event: PointerEvent): void {
 		if (event.button !== 0) return;
-		// 点在已有的框上：这是「打开这条批注看问答」，不是要新框一块
-		const mark = (event.target as HTMLElement | null)?.closest('.pickme-pdf-mark');
-		const markId = mark?.getAttribute('data-pickme-id');
+		// 点在已有的框上：这是「打开这条批注看问答」，不是要新框一块。
+		// 同一处可能叠着好几条（比如先划了荧光、又在上面框了一块）：点一次换下一条。
+		const hit = (event.target as HTMLElement | null)?.closest('.pickme-pdf-mark');
+		const stack = this.marksAt(slot, event, hit as HTMLElement | null);
+		const picked = this.cyclePick(stack, event);
+		const markId = picked?.getAttribute('data-pickme-id') ?? null;
+		const mark = picked ?? hit;
 		if (markId) {
+			if (stack.length > 1) {
+				const order = stack.map((node) => this.shapeWordForId(slot, node.getAttribute('data-pickme-id') ?? ''));
+				const at = stack.indexOf(mark as HTMLElement) + 1;
+				this.setStatus(t('这里叠了 {v0} 条批注（{v1}），再点一下看下一条', { v0: stack.length, v1: order.join(' → ') }) + ` · ${at}/${stack.length}`);
+			}
 			this.pendingMarkId = markId;
 			// 便利贴可以拖着换位置：先当「点一下看内容」，指针真动了再变成拖动
 			const holder = mark as HTMLElement | null;
@@ -1370,7 +1430,12 @@ export class PickmePdfView extends FileView {
 
 	// ---------- 荧光笔 ----------
 
-	/** 切换标注方式：荧光笔（拖一笔吸附到文字行）/ 框选（拖出一块区域） */
+	/** 再点一下同一个工具就取消选中：回到浏览态 */
+	private toggleAnnotateMode(mode: PdfAnnotateMode): void {
+		this.setAnnotateMode(this.plugin.settings.pdfAnnotateMode === mode ? 'none' : mode);
+	}
+
+	/** 切换标注方式：荧光笔（拖一笔吸附到文字行）/ 框选（拖出一块区域）/ 便利贴 / 浏览 */
 	private setAnnotateMode(mode: PdfAnnotateMode): void {
 		this.plugin.settings.pdfAnnotateMode = mode;
 		void this.plugin.saveSettings();
@@ -1387,11 +1452,14 @@ export class PickmePdfView extends FileView {
 		this.highlighterButton?.setAttribute('aria-pressed', String(mode === 'highlight'));
 		this.areaButton?.setAttribute('aria-pressed', String(mode === 'area'));
 		this.stickyButton?.setAttribute('aria-pressed', String(mode === 'note'));
-		// 页面上跟着换指针：荧光笔是笔刷，框选是十字，便利贴是便利贴图标
+		// 页面上跟着换指针：荧光笔是笔刷，框选是十字，便利贴是便利贴图标；浏览态是普通箭头
 		for (const slot of this.slots) {
 			slot.sheet.toggleClass('is-mode-highlight', mode === 'highlight');
 			slot.sheet.toggleClass('is-mode-note', mode === 'note');
 		}
+		// 工具态下让批注对指针透明：否则想在一个框上划荧光笔时，落笔只会打开那条批注
+		this.containerEl.toggleClass('pickme-pdf-tool-active', mode !== 'none');
+		this.containerEl.toggleClass('pickme-pdf-browse', mode === 'none');
 	}
 
 	/** 正在读的那条批注完整显形，同页其它批注退到背景（样式见 styles.css 的 is-active） */

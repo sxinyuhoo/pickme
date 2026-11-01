@@ -1812,6 +1812,30 @@ body.pickme-mark-border .pickme-mark {
 }
 
 
+/* 举着工具（荧光笔/框选/便利贴）时，批注对指针透明：
+   否则想在一个已有的框上划荧光笔，落笔只会打开那条批注。
+   子元素自己写着 pointer-events: auto，所以得连它们一起关掉 */
+.pickme-pdf-tool-active .pickme-pdf-mark,
+.pickme-pdf-tool-active .pickme-pdf-band,
+.pickme-pdf-tool-active .pickme-pdf-box,
+.pickme-pdf-tool-active .pickme-pdf-sticky,
+.pickme-pdf-tool-active .pickme-pdf-label {
+	pointer-events: none !important;
+}
+
+/* 浏览态（没选任何工具）：普通箭头，批注可以点。
+   注意覆盖层默认是十字（框选用的），浏览态要显式改回箭头 */
+.pickme-pdf-browse .pickme-pdf-sheet,
+.pickme-pdf-browse .pickme-pdf-overlay {
+	cursor: default;
+}
+
+.pickme-pdf-browse .pickme-pdf-box,
+.pickme-pdf-browse .pickme-pdf-band,
+.pickme-pdf-browse .pickme-pdf-sticky {
+	cursor: pointer;
+}
+
 /* 定位闪烁用的临时框：独立绘制、不吃鼠标事件，活一秒多就自己消失。
    注意 position 必须自己给：这个元素不挂 .pickme-pdf-mark，靠它定位的话
    left/top 会被忽略，框会一直蹲在页面左上角（表现为一个小圆点） */

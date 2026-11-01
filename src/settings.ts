@@ -578,6 +578,7 @@ export class PickmeSettingTab extends PluginSettingTab {
 							options: {
 								highlight: t('荧光笔'),
 								area: t('框选'),
+								none: t('浏览（不预设工具）'),
 							},
 						},
 					},

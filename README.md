@@ -14,7 +14,7 @@ Every annotation lives in its own Markdown file and stays linked to the source â
 | ![Three annotation types on one page: highlight bands, a region box and a sticky note](docs/screenshots/03-pdf-three-annotations.png) | ![The annotation index, grouped by source document](docs/screenshots/04-annotation-index.png) |
 | ![Clicking a sticky note opens its note box](docs/screenshots/06-pdf-sticky-note.png) | ![The built-in pdf.js viewer with its outline](docs/screenshots/05-pdf-viewer-outline.png) |
 
-In a PDF there are three annotation tools, side by side in the toolbar (the active one keeps an accent background, and the pointer changes with it):
+In a PDF there are three annotation tools, side by side in the toolbar (the active one keeps an accent background, and the pointer changes with it). **Click the active tool again to put it down**: the pointer goes back to a normal arrow so you can just read and click annotations. While a tool is up, annotations do not capture the pointer, so you can draw straight over an existing one; if several annotations overlap, click the same spot again to cycle through them (the status bar tells you how many are stacked).
 
 | Tool | How | What you get |
 | --- | --- | --- |
