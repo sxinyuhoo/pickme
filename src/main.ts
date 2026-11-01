@@ -310,10 +310,7 @@ export default class PickmePlugin extends Plugin {
 				if (candidates.length !== 1) continue;
 				if (await this.repository.moveSidecarFor(group.sourcePath, candidates[0].path)) moved += 1;
 			}
-			if (moved > 0) {
-				await this.refreshViews();
-				console.log(`pickme：已按同名文件修正 ${moved} 个批注文件的源路径`);
-			}
+			if (moved > 0) await this.refreshViews();
 			return moved;
 		} catch {
 			return 0;

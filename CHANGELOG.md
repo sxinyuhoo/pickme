@@ -2,6 +2,11 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.2.9
+
+- 修「闪烁只出现在页面左上角的一个小圆点」：定位闪烁用的临时框自己带 `position: absolute` 才能用 left/top 定位，之前漏了，于是框一直蹲在页面左上角（1.2.8 引入）
+- 清掉官方扫描器的报错：浏览器请求入口改用 DOM 类型里的 `window.fetch`（去掉 `any` 与 eslint-disable 注释）、移除一处 console.log
+
 ## 1.2.8
 
 - 定位闪烁改成**独立绘制的临时框**：不再依赖常驻标记元素，页面或标记怎么重绘都不会把闪烁冲掉（只活一秒多，不吃鼠标事件、不碰数据）

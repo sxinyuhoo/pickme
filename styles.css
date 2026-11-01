@@ -1812,8 +1812,11 @@ body.pickme-mark-border .pickme-mark {
 }
 
 
-/* 定位闪烁用的临时框：独立绘制、不吃鼠标事件，活一秒多就自己消失 */
+/* 定位闪烁用的临时框：独立绘制、不吃鼠标事件，活一秒多就自己消失。
+   注意 position 必须自己给：这个元素不挂 .pickme-pdf-mark，靠它定位的话
+   left/top 会被忽略，框会一直蹲在页面左上角（表现为一个小圆点） */
 .pickme-pdf-ghost {
+	position: absolute;
 	pointer-events: none;
 }
 

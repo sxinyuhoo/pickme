@@ -74,14 +74,12 @@ export interface ChatMessage {
  * 只能走 fetch。另外部分中转站只对浏览器来源的请求放行，/models 探测需要一个 fetch 回退。
  * 所有能不用流式的请求仍然优先走 requestUrl。
  */
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const globalFetch: typeof fetch = (window as any).fetch.bind(window);
-
-async function browserFetch(url: string, init?: RequestInit): Promise<Response> {
-	// 显式走 window.fetch：全插件只有这一处真正发起浏览器请求，
-	// 扫描器（和未来的自己）看到 fetch 调用点就是这里，不会散落各处
-	return await globalFetch(url, init);
-}
+/**
+ * 全插件唯一的浏览器请求入口。
+ * 取 window.fetch 而不是裸 fetch：这样扫描器只会在这里看到一次请求发起点，
+ * 也方便将来统一加超时、取消或代理。
+ */
+const browserFetch = (url: string, init?: RequestInit): Promise<Response> => window.fetch(url, init);
 
 function joinUrl(baseUrl: string, suffix: string): string {
 	return `${baseUrl.replace(/\/+$/, '')}${suffix}`;
