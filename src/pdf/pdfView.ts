@@ -242,10 +242,13 @@ export class PickmePdfView extends FileView {
 	/** 闪两下。先摘类再强制重排，否则连点同一条时第二次不会重新播动画 */
 	private flashMark(mark: HTMLElement): void {
 		mark.scrollIntoView({ block: 'center', behavior: 'smooth' });
-		mark.removeClass('is-flash');
-		void mark.offsetWidth;
-		mark.addClass('is-flash');
-		window.setTimeout(() => mark.removeClass('is-flash'), 1100);
+		// 等跳转/滚动落定再闪，否则闪烁会被同时发生的位置变化盖掉
+		window.setTimeout(() => {
+			mark.removeClass('is-flash');
+			void mark.offsetWidth;
+			mark.addClass('is-flash');
+		}, 150);
+		window.setTimeout(() => mark.removeClass('is-flash'), 1500);
 		// 真正闪出来了才把请求摘掉：视图万一被换掉，请求还留给下一个实例兑现
 		if (this.plugin.pendingFlash?.id === mark.getAttribute('data-pickme-id')) this.plugin.pendingFlash = null;
 	}

@@ -1646,15 +1646,37 @@ body.pickme-mark-border .pickme-mark {
 .pickme-pdf-mark.is-flash .pickme-pdf-label {
 	outline: 3px solid transparent;
 	outline-offset: 2px;
-	animation: pickme-flash 0.45s ease-in-out 2;
+	animation: pickme-flash 0.55s ease-in-out 2;
+}
+
+/* 再叠一层强调色填充：描边太细容易被忽略，填充一眼就能看见 */
+.pickme-pdf-mark.is-flash::after {
+	content: '';
+	position: absolute;
+	inset: -2px;
+	border-radius: 3px;
+	pointer-events: none;
+	animation: pickme-flash-fill 0.55s ease-in-out 2;
+}
+
+@keyframes pickme-flash-fill {
+	0%,
+	100% {
+		background-color: transparent;
+		box-shadow: 0 0 0 0 transparent;
+	}
+	45% {
+		background-color: color-mix(in srgb, var(--pk-acc) 30%, transparent);
+		box-shadow: 0 0 0 2px color-mix(in srgb, var(--pk-acc) 75%, transparent);
+	}
 }
 
 /* 正文里的标记：同样的两次呼吸，不改变它自己的底色/下划线样式 */
 .pickme-mark.is-flash {
-	outline: 2px solid transparent;
+	outline: 3px solid transparent;
 	outline-offset: 2px;
 	border-radius: 2px;
-	animation: pickme-flash 0.42s ease-in-out 2;
+	animation: pickme-flash 0.55s ease-in-out 2, pickme-flash-fill 0.55s ease-in-out 2;
 }
 
 @keyframes pickme-flash {

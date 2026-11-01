@@ -866,7 +866,7 @@ export default class PickmePlugin extends Plugin {
 			mark.removeClass('is-flash');
 			void mark.offsetWidth;
 			mark.addClass('is-flash');
-			window.setTimeout(() => mark.removeClass('is-flash'), 1100);
+			window.setTimeout(() => mark.removeClass('is-flash'), 1500);
 		}, 1800);
 	}
 
