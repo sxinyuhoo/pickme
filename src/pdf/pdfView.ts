@@ -281,7 +281,7 @@ export class PickmePdfView extends FileView {
 		if (this.plugin.settings.pdfAnnotateMode !== 'none') {
 			if (this.hoverEntryId === null) return;
 		}
-		const top = this.pickByPriority(this.marksAt(slot, event, null))[0] ?? null;
+		const top = this.pickByPriority(this.hitTest(slot, event))[0] ?? null;
 		const id = top?.getAttribute('data-pickme-id') ?? null;
 		if (id === this.hoverEntryId) return;
 		this.hoverEntryId = id;
@@ -289,6 +289,8 @@ export class PickmePdfView extends FileView {
 			for (const mark of page.overlay.querySelectorAll<HTMLElement>('.pickme-pdf-mark')) {
 				mark.toggleClass('is-hover', id !== null && mark.getAttribute('data-pickme-id') === id);
 			}
+			// 悬到批注上时指针变手型（框只认边框，判定在 hitTest 里）
+			page.overlay.toggleClass('is-over-mark', id !== null);
 		}
 	}
 
@@ -297,6 +299,29 @@ export class PickmePdfView extends FileView {
 	 * 用 elementsFromPoint 而不是 event.target：后者只给最上面的那一个，
 	 * 叠在一起时下面的就永远点不到了。
 	 */
+	/**
+	 * 命中判定。
+	 * - 荧光带、便利贴：元素命中（指针真的压在带子/图标上）
+	 * - 框选：只认「贴着边框」——框内部是一大块透明区域，点它不该开面板，
+	 *   否则想在这块区域里划一笔/框一块就永远被它挡住
+	 */
+	private hitTest(slot: PageSlot, event: PointerEvent): HTMLElement[] {
+		const hit = this.marksAt(slot, event, null);
+		const tol = 5; // 边框的容差（像素）：太细不好点，太宽又会挡住落笔
+		for (const mark of slot.overlay.querySelectorAll<HTMLElement>('.pickme-pdf-mark')) {
+			if (hit.includes(mark)) continue;
+			const box = mark.querySelector('.pickme-pdf-box');
+			if (!box) continue;
+			const r = box.getBoundingClientRect();
+			const x = event.clientX;
+			const y = event.clientY;
+			const inside = x >= r.left - tol && x <= r.right + tol && y >= r.top - tol && y <= r.bottom + tol;
+			const wellInside = x >= r.left + tol && x <= r.right - tol && y >= r.top + tol && y <= r.bottom - tol;
+			if (inside && !wellInside) hit.push(mark);
+		}
+		return hit;
+	}
+
 	private marksAt(slot: PageSlot, event: PointerEvent, fallback: HTMLElement | null): HTMLElement[] {
 		const nodes: HTMLElement[] = [];
 		const stack = typeof document.elementsFromPoint === 'function' ? document.elementsFromPoint(event.clientX, event.clientY) : [];
@@ -799,6 +824,7 @@ export class PickmePdfView extends FileView {
 				this.hoverEntryId = null;
 				for (const page of this.slots) {
 					for (const mark of page.overlay.querySelectorAll<HTMLElement>('.pickme-pdf-mark.is-hover')) mark.removeClass('is-hover');
+					page.overlay.removeClass('is-over-mark');
 				}
 			});
 			overlay.addEventListener('pointercancel', () => {
@@ -1152,6 +1178,14 @@ export class PickmePdfView extends FileView {
 			const outer = pdfToScreenRect(pdf.rect, size, pdf.pageSize, rotation);
 			const mark = slot.overlay.createDiv({ cls: 'pickme-pdf-mark' });
 			mark.setAttribute('data-pickme-id', entry.id);
+			// 层级写在批注自己身上：荧光在下、框在上、便利贴再上。
+			// 不能只给子形状定 z-index——批注被压暗（opacity<1）或缩放时会新建层叠上下文，
+			// 子元素的 z-index 就被困在自己那层里，叠在一起时框还是会被荧光乘暗。
+			const shapeList = shapesOf(pdf);
+			const stickyMark = shapeList.length > 0 && shapeList.every((shape) => shape.kind === 'note');
+			const hasBox = shapeList.some((shape) => shape.kind !== 'line' && shape.kind !== 'note');
+			// 注意用 kebab-case：setCssProps 走的是 style.setProperty，驼峰名会被静默忽略
+			mark.setCssProps({ 'z-index': stickyMark ? '3' : hasBox ? '2' : '1' });
 			mark.setCssProps({
 				left: `${outer[0]}px`,
 				top: `${outer[1]}px`,
@@ -1184,15 +1218,6 @@ export class PickmePdfView extends FileView {
 			// 每条批注一个「把手」：只有把手上能点开，形状本身永远不吃指针。
 			// 这样在任何模式（举着笔/浏览）都能落笔，也都能点开批注，不用来回切模式。
 			// 位置统一在左侧：框是左边缘中点，荧光带是行带开头（左右统一一个方向，才好找）。
-			if (!isSticky) {
-				const handle = mark.createDiv({ cls: 'pickme-pdf-handle' });
-				handle.setCssProps({
-					left: '-7px',
-					top: `${Math.round((outer[3] - outer[1]) / 2) - 6}px`,
-				});
-				handle.setAttribute('title', entry.qas[0]?.question ?? t('第 {v0} 页 · {v1}', { v0: pdf.page, v1: this.shapeWord(pdf) }));
-			}
-
 			// 页码与形状标签：只在选中或悬停时显示，静止态保持页面干净
 			const label = mark.createDiv({ cls: 'pickme-pdf-label' });
 			label.setText(t('第 {v0} 页 · {v1}', { v0: pdf.page, v1: this.shapeWord(pdf) }));
@@ -1205,8 +1230,8 @@ export class PickmePdfView extends FileView {
 		if (event.button !== 0) return;
 		// 点在已有的框上：这是「打开这条批注看问答」，不是要新框一块。
 		// 同一处可能叠着好几条（比如先划了荧光、又在上面框了一块）：点一次换下一条。
-		const hit = (event.target as HTMLElement | null)?.closest('.pickme-pdf-mark');
-		const stack = this.marksAt(slot, event, hit as HTMLElement | null);
+		const hit = (event.target as HTMLElement | null)?.closest<HTMLElement>('.pickme-pdf-mark') ?? null;
+		const stack = hit ? this.marksAt(slot, event, hit) : this.hitTest(slot, event);
 		const picked = this.cyclePick(stack, event);
 		const markId = picked?.getAttribute('data-pickme-id') ?? null;
 		const mark = picked ?? hit;

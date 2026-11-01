@@ -16,7 +16,7 @@ Every annotation lives in its own Markdown file and stays linked to the source �
 
 In a PDF there are three annotation tools, side by side in the toolbar (the active one keeps an accent background, and the pointer changes with it). **Click the active tool again to put it down**: the pointer goes back to a normal arrow so you can just read.
 
-Every highlight and region carries a small round **handle** on its left edge — click the handle to open that annotation (a sticky note is opened by its own icon). The body of an annotation never captures the pointer, so you can draw straight over an existing highlight or box, in any mode. Hovering a handle highlights that annotation and shows its label.
+To open an annotation: hover its **highlight band** (anywhere on the highlighted text) and click, or hover the **border** of a region — the interior of a region is deliberately not clickable, so you can always draw inside it. A sticky note opens from its own icon. Hovering shows the annotation's label and dims the others; the body of an annotation never blocks drawing, so you can annotate straight over existing ones in any mode.
 
 | Tool | How | What you get |
 | --- | --- | --- |
