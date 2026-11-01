@@ -296,8 +296,7 @@ export const EN: Record<string, string> = {
 	'删除 {v0} 条批注？正文里对应的锚点标签会一并移除，原文其它内容不会改动；PDF 批注的区域截图会一起删掉。':
 		'Delete {v0} annotations? Their anchor tags in the source are removed too, nothing else in the source is changed, and region screenshots of PDF annotations are deleted along with them.',
 	'已删除 {v0} 条批注': 'Deleted {v0} annotations',
-	'全部批注（索引）': 'All annotations (index)',
-	'打开批注索引': 'Open annotation index',
+	'打开批注索引': 'All annotations (index)',
 	// PDF 目录面板
 	'目录': 'Contents',
 	'隐藏目录': 'Hide contents',

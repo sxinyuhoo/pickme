@@ -139,6 +139,8 @@ export default class PickmePlugin extends Plugin {
 		);
 		// 启动时再补扫一遍历史遗留。等布局就绪后再缓两秒，避免库还没加载完就把「暂时看不见」当成「文件没了」
 		this.app.workspace.onLayoutReady(() => {
+			// 源路径过期自愈与「清理孤儿」是两件事：前者是修正，后者是删除，先修正再清理
+			window.setTimeout(() => void this.repairStaleSources(), 2500);
 			if (!this.settings.pruneOrphanAnnotations) return;
 			window.setTimeout(() => void this.pruneOrphanAnnotations(), 2000);
 		});
@@ -288,6 +290,33 @@ export default class PickmePlugin extends Plugin {
 			if (await this.repository.moveSidecarFor(oldPath, newPath)) await this.refreshViews();
 		} catch {
 			// 搬不动不算错，读取时的四层兜底仍然能用
+		}
+	}
+
+	/**
+	 * 源路径过期自愈：批注文件里记的路径已经不存在，但库里存在**同名且唯一**的文件时，
+	 * 说明这个文档在插件监听之外被移动/改名过（iCloud 同步、系统文件夹里直接移动、插件没装时的历史操作），
+	 * 就把批注文件按新路径搬过去。只认「唯一同名」，所以不会搬错。
+	 */
+	async repairStaleSources(): Promise<number> {
+		try {
+			const all = this.app.vault.getFiles();
+			const groups = await this.repository.indexData();
+			let moved = 0;
+			for (const group of groups) {
+				if (this.app.vault.getAbstractFileByPath(group.sourcePath)) continue;
+				const name = group.sourcePath.split('/').pop() ?? group.sourcePath;
+				const candidates = all.filter((file) => file.name === name);
+				if (candidates.length !== 1) continue;
+				if (await this.repository.moveSidecarFor(group.sourcePath, candidates[0].path)) moved += 1;
+			}
+			if (moved > 0) {
+				await this.refreshViews();
+				console.log(`pickme：已按同名文件修正 ${moved} 个批注文件的源路径`);
+			}
+			return moved;
+		} catch {
+			return 0;
 		}
 	}
 
@@ -866,7 +895,7 @@ export default class PickmePlugin extends Plugin {
 			mark.removeClass('is-flash');
 			void mark.offsetWidth;
 			mark.addClass('is-flash');
-			window.setTimeout(() => mark.removeClass('is-flash'), 1500);
+			window.setTimeout(() => mark.removeClass('is-flash'), 1100);
 		}, 1800);
 	}
 
@@ -914,7 +943,27 @@ export default class PickmePlugin extends Plugin {
 		// PDF 批注没有正文锚点，跳到对应页并高亮矩形
 		if (target.extension === 'pdf') {
 			const { doc: pdfDoc } = await this.repository.loadFor(target);
-			const pdfEntry = pdfDoc.entries.find((item) => item.id === id);
+			let detached = false;
+			let pdfEntry = pdfDoc.entries.find((item) => item.id === id);
+			if (!pdfEntry) {
+				// 批注文件里记的源路径可能已经过期（文档被移动/改名过，且当时没有人在监听），
+				// 这时按 id 在所有批注文件里找一遍：找到就把批注文件搬到新家（数据自愈），再照常跳转
+				const groups = await this.repository.indexData();
+				for (const group of groups) {
+					const hit = group.entries.find((item) => item.id === id);
+					if (!hit) continue;
+					pdfEntry = hit;
+					detached = true;
+					if (group.sourcePath !== target.path) {
+						try {
+							if (await this.repository.moveSidecarFor(group.sourcePath, target.path)) await this.refreshViews();
+						} catch {
+							// 搬不动也没关系：下面走「临时框」定位
+						}
+					}
+					break;
+				}
+			}
 			if (!pdfEntry?.pdf) {
 				new Notice(t('pickme：找不到批注 {v0}', { v0: id }));
 				return;
@@ -924,8 +973,9 @@ export default class PickmePlugin extends Plugin {
 			const openView = this.pdfViewFor(target.path);
 			if (openView) {
 				await this.app.workspace.revealLeaf(openView.leaf);
-				await openView.focusEntry(id);
-				this.armFlashFallback(id, target);
+				if (detached) await openView.flashDetachedEntry(pdfEntry);
+				else await openView.focusEntry(id);
+				if (!detached) this.armFlashFallback(id, target);
 				return;
 			}
 			if (this.settings.pdfViewerEnabled) {
@@ -935,8 +985,9 @@ export default class PickmePlugin extends Plugin {
 					const created = this.pdfViewFor(target.path);
 					if (created) {
 						await this.app.workspace.revealLeaf(created.leaf);
-						await created.focusEntry(id);
-						this.armFlashFallback(id, target);
+						if (detached) await created.flashDetachedEntry(pdfEntry);
+						else await created.focusEntry(id);
+						if (!detached) this.armFlashFallback(id, target);
 						return;
 					}
 					await new Promise((resolve) => window.setTimeout(resolve, 200));

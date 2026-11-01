@@ -248,9 +248,43 @@ export class PickmePdfView extends FileView {
 			void mark.offsetWidth;
 			mark.addClass('is-flash');
 		}, 150);
-		window.setTimeout(() => mark.removeClass('is-flash'), 1500);
+		window.setTimeout(() => mark.removeClass('is-flash'), 1100);
 		// 真正闪出来了才把请求摘掉：视图万一被换掉，请求还留给下一个实例兑现
 		if (this.plugin.pendingFlash?.id === mark.getAttribute('data-pickme-id')) this.plugin.pendingFlash = null;
+	}
+
+	/**
+	 * 批注不在当前文档的批注文件里时（批注文件记的源路径过期、两边文件又都存在，没法自动搬），
+	 * 临时按几何信息画一个框闪两下——只做视觉定位，不碰任何数据。
+	 */
+	async flashDetachedEntry(entry: AnnotationEntry): Promise<void> {
+		const pdf = entry.pdf;
+		if (!pdf) return;
+		for (let attempt = 0; attempt < 30; attempt++) {
+			const slot = this.slots[pdf.page - 1];
+			if (slot && !slot.rendered && !slot.rendering) {
+				// 这一页可能还没画（甚至被释放过）：先滚过去，再把它排到渲染队首
+				this.scrollToPage(pdf.page);
+				this.queueRenders([slot], true);
+			}
+			if (slot && (slot.rendered || slot.failed)) {
+				const size = this.slotSize(slot);
+				const outer = pdfToScreenRect(pdf.rect, size, pdf.pageSize, pdf.rotation ?? 0);
+				const ghost = slot.overlay.createDiv({ cls: 'pickme-pdf-mark pickme-pdf-ghost' });
+				ghost.setAttribute('data-pickme-id', entry.id);
+				ghost.setCssProps({
+					left: `${outer[0]}px`,
+					top: `${outer[1]}px`,
+					width: `${Math.max(6, outer[2] - outer[0])}px`,
+					height: `${Math.max(6, outer[3] - outer[1])}px`,
+				});
+				ghost.createDiv({ cls: 'pickme-pdf-box' });
+				ghost.addClass('is-flash');
+				window.setTimeout(() => ghost.remove(), 1100);
+				return;
+			}
+			await new Promise((resolve) => window.setTimeout(resolve, 200));
+		}
 	}
 
 	/**

@@ -1,4 +1,4 @@
-import { ItemView, MarkdownRenderer, Notice, TFile, WorkspaceLeaf } from 'obsidian';
+import { ItemView, MarkdownRenderer, Notice, TFile, WorkspaceLeaf, setIcon } from 'obsidian';
 import { t } from '../i18n.ts';
 import type PickmePlugin from '../main.ts';
 import type { AnnotationDoc, AnnotationEntry } from '../core/types.ts';
@@ -135,7 +135,10 @@ export class PickmeSidebarView extends ItemView implements AskSink {
 			text: t('{v0} 条批注', { v0: this.doc?.entries.length ?? 0 }),
 		});
 		// 想一次看全库的批注，走索引侧边栏
-		const toIndex = header.createEl('a', { cls: 'pickme-index-link', text: t('全部批注（索引）') });
+		// 小按钮：一键打开这个库的批注索引（文字链接太占横向空间，图标按钮更省）
+		const toIndex = header.createEl('button', { cls: 'pickme-icon-button pickme-index-link' });
+		setIcon(toIndex, 'panel-right-open');
+		toIndex.setAttribute('aria-label', t('打开批注索引'));
 		toIndex.setAttribute('title', t('打开批注索引'));
 		toIndex.onclick = (event) => {
 			event.preventDefault();
