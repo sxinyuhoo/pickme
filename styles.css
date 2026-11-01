@@ -675,10 +675,12 @@ body.pickme-mark-border .pickme-mark {
 
 /* 索引视图自己管内边距，别和主题的 view-content 叠加成两层。
    注意：视图根元素本身就带 view-content 类，选择器权重比 .pickme-index 高，
-   所以边距必须在这里给出，否则会被这条规则压成 0（内容贴边） */
+   所以边距和滚动都必须在这里给出，否则会被这条规则压成 0（内容贴边、且滚不动） */
 .workspace-leaf-content[data-type="pickme-index-view"] .view-content {
 	padding: 12px 12px 32px;
-	overflow: hidden;
+	overflow-y: auto;
+	overflow-x: hidden;
+	overscroll-behavior: contain;
 }
 
 /* ================= 批注索引 ================= */

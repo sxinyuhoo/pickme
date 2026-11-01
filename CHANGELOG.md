@@ -2,6 +2,12 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.2.3
+
+- 修批注索引点进去不闪烁：以前标记元素一出现就闪，而那时页面还是白纸——现在等这一页真正渲染完成（或渲染失败）再闪
+- 修批注索引没有滚动条：视图容器的 overflow 是 hidden，内容超出的部分既看不见也滚不动
+- PDF 闪烁统一由阅读器自己在「渲染完成」后触发（正文批注仍由插件在跳转后触发）
+
 ## 1.2.2
 
 - 修「便利贴批注点击不闪烁」：闪烁规则漏了便利贴这一种标注（只覆盖了行带、框、页码标签）

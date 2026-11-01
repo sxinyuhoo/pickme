@@ -219,11 +219,26 @@ export class PickmePdfView extends FileView {
 			// 目标页可能还没画，先把渲染排到队首
 			this.queueRenders([slot], true);
 		}
+		// 等这一页真正画完再闪：页面还白着的时候闪，等于没闪
+		this.flashWhenRendered(id, slot ?? null, 0);
+	}
+
+	/**
+	 * 等目标页渲染完成再闪两下。
+	 * 从索引点进来时视图是新建的：标记元素会立刻出现在 DOM 里（绝对定位，尺寸不为 0），
+	 * 但下面的画布还是白的——这时候闪用户根本看不到，所以要盯 slot.rendered。
+	 */
+	private flashWhenRendered(id: string, slot: PageSlot | null, attempt: number): void {
 		const mark = slot?.overlay.querySelector(`[data-pickme-id="${id}"]`);
-		if (mark instanceof HTMLElement) {
+		const ready = slot ? slot.rendered || slot.failed : false;
+		if (mark instanceof HTMLElement && ready) {
+			mark.scrollIntoView({ block: 'center', behavior: 'smooth' });
 			mark.addClass('is-flash');
-			window.setTimeout(() => mark.removeClass('is-flash'), 1200);
+			window.setTimeout(() => mark.removeClass('is-flash'), 1100);
+			return;
 		}
+		// 最多等 6 秒（每 200ms 一次）：冷启动时渲染队列可能排在后面
+		if (attempt < 30) window.setTimeout(() => this.flashWhenRendered(id, slot, attempt + 1), 200);
 	}
 
 	/**

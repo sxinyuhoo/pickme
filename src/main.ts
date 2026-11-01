@@ -850,18 +850,13 @@ export default class PickmePlugin extends Plugin {
 	 */
 	private flashEntry(id: string, file: TFile, attempt = 0): void {
 		const selector = `[data-pickme-id="${CSS.escape(id)}"]`;
+		// PDF 不在这一层处理：那边要等页面真正渲染完再闪，见 PickmePdfView.flashWhenRendered
+		if (file.extension === 'pdf') return;
 		const found: HTMLElement[] = [];
 		const visible = (el: HTMLElement) => {
 			const rect = el.getBoundingClientRect();
 			return rect.width > 0 && rect.height > 0;
 		};
-		const pdf = this.pdfViewFor(file.path);
-		if (pdf) {
-			// 翻页之后 slot 要重新画：元素在 DOM 里但尺寸为 0 时不算「到位」，继续等
-			pdf.leaf.view.containerEl.querySelectorAll<HTMLElement>(selector).forEach((el) => {
-				if (visible(el)) found.push(el);
-			});
-		}
 		for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
 			const view = leaf.view;
 			if (!(view instanceof MarkdownView) || view.file?.path !== file.path) continue;
@@ -901,7 +896,6 @@ export default class PickmePlugin extends Plugin {
 			if (openView) {
 				await this.app.workspace.revealLeaf(openView.leaf);
 				await openView.focusEntry(id);
-				this.flashEntry(id, target);
 				return;
 			}
 			if (this.settings.pdfViewerEnabled) {
@@ -909,7 +903,6 @@ export default class PickmePlugin extends Plugin {
 				const created = this.pdfViewFor(target.path);
 				if (created) await this.app.workspace.revealLeaf(created.leaf);
 				await created?.focusEntry(id);
-				this.flashEntry(id, target);
 				return;
 			}
 			const pdfLeaf = this.app.workspace.getLeaf(false);
