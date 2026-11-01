@@ -851,6 +851,26 @@ export default class PickmePlugin extends Plugin {
 	pendingFlash: { id: string; filePath: string; until: number } | null = null;
 
 	/**
+	 * 兜底保险：把闪烁交给视图之后，过一会儿检查请求有没有被兑现。
+	 * 视图没建出来、渲染卡住、实例被换掉……任何一条路走岔，这里都能补上一次闪烁，
+	 * 保证「点了就该闪」这件事不依赖某一条代码路径。
+	 */
+	private armFlashFallback(id: string, file: TFile): void {
+		window.setTimeout(() => {
+			const pending = this.pendingFlash;
+			if (!pending || pending.id !== id || pending.filePath !== file.path) return; // 已经闪过了
+			const view = this.pdfViewFor(file.path);
+			const mark = view?.leaf.view.containerEl.querySelector<HTMLElement>(`[data-pickme-id="${CSS.escape(id)}"]`);
+			if (!mark) return;
+			this.pendingFlash = null;
+			mark.removeClass('is-flash');
+			void mark.offsetWidth;
+			mark.addClass('is-flash');
+			window.setTimeout(() => mark.removeClass('is-flash'), 1100);
+		}, 1800);
+	}
+
+	/**
 	 * 跳到批注之后让它闪两下。
 	 * 同一页批注一多，光靠选区很难一眼找到位置；闪两下是最省事的定位手段。
 	 * PDF 的标记是异步画出来的（翻页后要等渲染），所以要重试几次直到元素出现。
@@ -905,6 +925,7 @@ export default class PickmePlugin extends Plugin {
 			if (openView) {
 				await this.app.workspace.revealLeaf(openView.leaf);
 				await openView.focusEntry(id);
+				this.armFlashFallback(id, target);
 				return;
 			}
 			if (this.settings.pdfViewerEnabled) {
@@ -915,6 +936,7 @@ export default class PickmePlugin extends Plugin {
 					if (created) {
 						await this.app.workspace.revealLeaf(created.leaf);
 						await created.focusEntry(id);
+						this.armFlashFallback(id, target);
 						return;
 					}
 					await new Promise((resolve) => window.setTimeout(resolve, 200));
