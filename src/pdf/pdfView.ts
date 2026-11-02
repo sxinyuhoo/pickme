@@ -289,6 +289,7 @@ export class PickmePdfView extends FileView {
 			}
 			// 悬到批注上时指针变手型（框只认边框，判定在 hitTest 里）
 			page.overlay.toggleClass('is-over-mark', id !== null);
+			page.overlay.toggleClass('has-hover', id !== null);
 		}
 	}
 
@@ -678,7 +679,7 @@ export class PickmePdfView extends FileView {
 			const item = toc.createDiv({ cls: 'pickme-pdf-toc-item' });
 			item.setText(entry.title);
 			// 注意：setCssProps 传 camelCase 键在这个版本不落地（内联样式为空），直接赋 style 才稳
-			item.style.paddingLeft = `${8 + entry.depth * 12}px`;
+			item.setCssProps({ 'padding-left': `${8 + entry.depth * 12}px` });
 			item.setAttribute('data-page', entry.page === null ? '' : String(entry.page));
 			item.setAttribute('title', entry.page === null ? entry.title : `${entry.title} · ${t('第 {v0} 页', { v0: entry.page })}`);
 			if (entry.page === null) item.addClass('is-nolink');
@@ -823,6 +824,7 @@ export class PickmePdfView extends FileView {
 				for (const page of this.slots) {
 					for (const mark of page.overlay.querySelectorAll<HTMLElement>('.pickme-pdf-mark.is-hover')) mark.removeClass('is-hover');
 					page.overlay.removeClass('is-over-mark');
+					page.overlay.removeClass('has-hover');
 				}
 			});
 			overlay.addEventListener('pointercancel', () => {
@@ -1241,7 +1243,7 @@ export class PickmePdfView extends FileView {
 			}
 			this.pendingMarkId = markId;
 			// 便利贴可以拖着换位置：先当「点一下看内容」，指针真动了再变成拖动
-			const holder = mark as HTMLElement | null;
+			const holder: HTMLElement | null = mark;
 			const icon = holder?.querySelector('.pickme-pdf-sticky');
 			this.stickyDrag = icon && holder ? { id: markId, mark: holder, start: this.relativePoint(slot, event), moved: false } : null;
 			if (this.stickyDrag) {
@@ -1259,6 +1261,7 @@ export class PickmePdfView extends FileView {
 			for (const page of this.slots) {
 				for (const mark of page.overlay.querySelectorAll<HTMLElement>('.pickme-pdf-mark.is-hover')) mark.removeClass('is-hover');
 				page.overlay.removeClass('is-over-mark');
+				page.overlay.removeClass('has-hover');
 			}
 		}
 		// 浏览态：只用来阅读和点批注，落笔不产生任何东西
@@ -1563,6 +1566,8 @@ export class PickmePdfView extends FileView {
 	/** 正在读的那条批注完整显形，同页其它批注退到背景（样式见 styles.css 的 is-active） */
 	private applyActiveMark(): void {
 		for (const slot of this.slots) {
+			// 状态类挂在这里，样式里就不用 :has 了
+			slot.overlay.toggleClass('has-active', this.panelEntryId !== null);
 			for (const mark of slot.overlay.querySelectorAll<HTMLElement>('.pickme-pdf-mark')) {
 				mark.toggleClass('is-active', mark.getAttribute('data-pickme-id') === this.panelEntryId);
 			}

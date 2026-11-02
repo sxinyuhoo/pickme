@@ -2,6 +2,15 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.5.4
+
+- 按官方扫描器整改：
+  - 目录缩进与 pdf.js 画布尺寸改为 `setCssProps`（不再直写 `element.style`）
+  - 去掉一处多余的类型断言
+  - 去掉样式表里重复的 `border-radius`
+  - 「减少动效」块改用提高特异性而非强改符
+  - 去掉两处 `:has`（会触发大范围选择器失效）：批注的「悬停压暗 / 选中压暗」改由 JS 在 overlay 上挂 `has-hover` / `has-active` 状态类
+
 ## 1.5.3
 
 - 修「举着荧光笔 / 便利贴 / 框选时，指针移到框的边框上不变手型」：模式光标（笔刷 / 十字 / 便利贴）的选择器权重和「悬停手型」一样高，谁写在后面谁赢；现在把悬停手型的规则排到模式光标之后，并逐模式提高特异性，四种模式下边框、荧光带、便利贴都会变手型

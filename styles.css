@@ -849,7 +849,6 @@ body.pickme-mark-border .pickme-mark {
 	padding: 7px 16px 7px 18px;
 	margin: 0 -8px;
 	border-left: none;
-	border-radius: 0;
 	cursor: pointer;
 	transition: var(--pk-t);
 	border-radius: var(--pk-r-sm);
@@ -1604,7 +1603,8 @@ body.pickme-mark-border .pickme-mark {
 	filter: brightness(1.02);
 }
 
-.pickme-pdf-overlay:has(.pickme-pdf-mark.is-hover) .pickme-pdf-mark:not(.is-hover) {
+/* 用 JS 挂的 .has-hover / .has-active 代替 :has —— 后者会触发大范围选择器失效，性能不划算 */
+.pickme-pdf-overlay.has-hover .pickme-pdf-mark:not(.is-hover) {
 	opacity: 0.28;
 }
 
@@ -1621,7 +1621,7 @@ body.pickme-mark-border .pickme-mark {
 	border-color: color-mix(in srgb, var(--pk-acc) 90%, transparent);
 }
 
-.pickme-pdf-overlay:has(.pickme-pdf-mark.is-active) .pickme-pdf-mark:not(.is-active) {
+.pickme-pdf-overlay.has-active .pickme-pdf-mark:not(.is-active) {
 	opacity: 0.15;
 }
 
@@ -1831,12 +1831,13 @@ body.pickme-mark-border .pickme-mark {
    ========================================================== */
 
 @media (prefers-reduced-motion: reduce) {
-	.pickme-sidebar *,
-	.pickme-index *,
-	.pickme-pdf *,
-	.pickme-panel *,
-	.pickme-mark {
-		transition: none !important;
+	/* 刻意不用强改符：加一层 body 提高特异性，且写在文件末尾，稳定压过各处 transition */
+	body .pickme-sidebar *,
+	body .pickme-index *,
+	body .pickme-pdf *,
+	body .pickme-panel *,
+	body .pickme-mark {
+		transition: none;
 	}
 }
 
