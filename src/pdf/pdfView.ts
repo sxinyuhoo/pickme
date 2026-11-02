@@ -1657,7 +1657,11 @@ export class PickmePdfView extends FileView {
 		const targets: MergeTarget[] = [];
 		for (const item of doc.entries) {
 			if (item.kind !== 'pdf' || !item.pdf || item.pdf.page !== slot.index) continue;
-			targets.push({ id: item.id, page: item.pdf.page, bands: shapesOf(item.pdf).map((shape) => shape.rect) });
+			const shapes = shapesOf(item.pdf);
+			// 只并入「荧光高亮」：框选、便利贴是另一种批注，绝不能把一笔荧光并进去——
+			// 并进去之后两者是同一条数据，删框会把荧光一起删掉，颜色也会叠成一块
+			if (shapes.length === 0 || shapes.some((shape) => shape.kind !== 'line')) continue;
+			targets.push({ id: item.id, page: item.pdf.page, bands: shapes.map((shape) => shape.rect) });
 		}
 		const targetId = pickMergeTarget(targets, slot.index, strokeStart, lineHeight);
 		if (!targetId) return false;

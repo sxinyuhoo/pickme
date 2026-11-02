@@ -1585,7 +1585,8 @@ body.pickme-mark-border .pickme-mark {
 	position: absolute;
 	z-index: 2;
 	border: 1px solid color-mix(in srgb, var(--pk-acc) 62%, transparent);
-	background: color-mix(in srgb, var(--pk-acc) 5%, transparent);
+	/* 不铺底色：框只做「圈出来」，任何底色都会和叠在下面的荧光带互相染色 */
+	background: transparent;
 	border-radius: 2px;
 	pointer-events: auto;
 	cursor: pointer;
