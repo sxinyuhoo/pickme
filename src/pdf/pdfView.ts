@@ -1253,7 +1253,15 @@ export class PickmePdfView extends FileView {
 			}
 			return;
 		}
-		// 浏览态：只用来阅读和点把手，落笔不产生任何东西
+		// 真要落笔了：先把悬停态清掉，否则画到一半指针还停在“手型”
+		if (this.hoverEntryId !== null) {
+			this.hoverEntryId = null;
+			for (const page of this.slots) {
+				for (const mark of page.overlay.querySelectorAll<HTMLElement>('.pickme-pdf-mark.is-hover')) mark.removeClass('is-hover');
+				page.overlay.removeClass('is-over-mark');
+			}
+		}
+		// 浏览态：只用来阅读和点批注，落笔不产生任何东西
 		if (this.plugin.settings.pdfAnnotateMode === 'none') {
 			this.resetDrag();
 			return;
