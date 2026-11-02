@@ -288,7 +288,7 @@ export class AskPanel implements AskSink {
 		// 面板每次重画都是新元素，不先把上次落点写上去就会闪回左上角
 		// （真机上表现为「发送后框自己跳到左上角」——回答落盘会触发一次 reload）
 		if (this.lastPosition) {
-			root.setCssProps({ left: `${this.lastPosition.left}px`, top: `${this.lastPosition.top}px` });
+			root.setCssProps({ '--pk-l': `${this.lastPosition.left}px`, '--pk-t': `${this.lastPosition.top}px` });
 		}
 
 		const head = root.createDiv({ cls: 'pickme-panel-head' });
@@ -586,17 +586,17 @@ export class AskPanel implements AskSink {
 		if (hostRect.width <= 0 || hostRect.height <= 0) {
 			// 视图正在重建、这一帧还量不到宿主尺寸：先不挪，否则会被夹到左上角去
 			const fallback = this.lastPosition ?? { left: 12, top: 12 };
-			root.setCssProps({ left: `${fallback.left}px`, top: `${fallback.top}px` });
+			root.setCssProps({ '--pk-l': `${fallback.left}px`, '--pk-t': `${fallback.top}px` });
 			return;
 		}
 		if (!anchor) {
 			// 沿用上次落点；确实没有过落点（首次打开且量不到锚点）才退回左上角
 			const fallback = this.lastPosition ?? { left: 12, top: 12 };
-			root.setCssProps({ left: `${fallback.left}px`, top: `${fallback.top}px` });
+			root.setCssProps({ '--pk-l': `${fallback.left}px`, '--pk-t': `${fallback.top}px` });
 			return;
 		}
 		const width = Math.min(PANEL_WIDTH, Math.max(240, hostRect.width - 24));
-		root.setCssProps({ width: `${width}px` });
+		root.setCssProps({ '--pk-w': `${width}px` });
 
 		// 面板放在锚点哪一侧，只在「这一侧真的放不下、另一侧放得下」时才换。
 		// 锚点稍微动一下就左右翻边，比贴着锚点更让人看不清——阅读滚动时尤其明显。
@@ -621,7 +621,7 @@ export class AskPanel implements AskSink {
 		if (top < 8) top = 8;
 
 		this.lastPosition = { left: Math.round(left), top: Math.round(top) };
-		root.setCssProps({ left: `${this.lastPosition.left}px`, top: `${this.lastPosition.top}px` });
+		root.setCssProps({ '--pk-l': `${this.lastPosition.left}px`, '--pk-t': `${this.lastPosition.top}px` });
 	}
 }
 

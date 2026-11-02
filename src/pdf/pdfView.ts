@@ -243,10 +243,10 @@ export class PickmePdfView extends FileView {
 				const ghost = slot.overlay.createDiv({ cls: 'pickme-pdf-ghost pickme-pdf-flash' });
 				ghost.setAttribute('data-pickme-id', entry.id);
 				ghost.setCssProps({
-					left: `${outer[0]}px`,
-					top: `${outer[1]}px`,
-					width: `${Math.max(6, outer[2] - outer[0])}px`,
-					height: `${Math.max(6, outer[3] - outer[1])}px`,
+					'--pk-l': `${outer[0]}px`,
+					'--pk-t': `${outer[1]}px`,
+					'--pk-w': `${Math.max(6, outer[2] - outer[0])}px`,
+					'--pk-h': `${Math.max(6, outer[3] - outer[1])}px`,
 				});
 				ghost.createDiv({ cls: 'pickme-pdf-box' });
 				const view = this.scrollEl?.getBoundingClientRect();
@@ -678,8 +678,8 @@ export class PickmePdfView extends FileView {
 		for (const entry of this.tocEntries) {
 			const item = toc.createDiv({ cls: 'pickme-pdf-toc-item' });
 			item.setText(entry.title);
-			// 注意：setCssProps 传 camelCase 键在这个版本不落地（内联样式为空），直接赋 style 才稳
-			item.setCssProps({ 'padding-left': `${8 + entry.depth * 12}px` });
+			// 缩进走自定义属性（社区规则只允许 setCssProps 写 --* 变量），样式表里消费
+			item.setCssProps({ '--pk-pad': `${8 + entry.depth * 12}px` });
 			item.setAttribute('data-page', entry.page === null ? '' : String(entry.page));
 			item.setAttribute('title', entry.page === null ? entry.title : `${entry.title} · ${t('第 {v0} 页', { v0: entry.page })}`);
 			if (entry.page === null) item.addClass('is-nolink');
@@ -844,9 +844,9 @@ export class PickmePdfView extends FileView {
 	/** 把槽位的显示尺寸按当前缩放写到 DOM 上（画布没渲染也要占对位置） */
 	private applySlotSize(slot: PageSlot): void {
 		const [width, height] = this.slotSize(slot);
-		slot.sheet.setCssProps({ width: `${width}px`, height: `${height}px` });
-		slot.canvas.setCssProps({ width: `${width}px`, height: `${height}px` });
-		slot.overlay.setCssProps({ width: `${width}px`, height: `${height}px` });
+		slot.sheet.setCssProps({ '--pk-w': `${width}px`, '--pk-h': `${height}px` });
+		slot.canvas.setCssProps({ '--pk-w': `${width}px`, '--pk-h': `${height}px` });
+		slot.overlay.setCssProps({ '--pk-w': `${width}px`, '--pk-h': `${height}px` });
 	}
 
 	/** 记录每页在滚动内容里的位置与高度（只在这里读布局，滚动过程中不再读） */
@@ -1184,13 +1184,13 @@ export class PickmePdfView extends FileView {
 			const shapeList = shapesOf(pdf);
 			const stickyMark = shapeList.length > 0 && shapeList.every((shape) => shape.kind === 'note');
 			const hasBox = shapeList.some((shape) => shape.kind !== 'line' && shape.kind !== 'note');
-			// 注意用 kebab-case：setCssProps 走的是 style.setProperty，驼峰名会被静默忽略
-			mark.setCssProps({ 'z-index': stickyMark ? '3' : hasBox ? '2' : '1' });
+			// 层级用类名（社区规则不允许把真实属性写进 setCssProps）
+			mark.addClass(stickyMark ? 'is-mark-sticky' : hasBox ? 'is-mark-box' : 'is-mark-band');
 			mark.setCssProps({
-				left: `${outer[0]}px`,
-				top: `${outer[1]}px`,
-				width: `${Math.max(6, outer[2] - outer[0])}px`,
-				height: `${Math.max(6, outer[3] - outer[1])}px`,
+				'--pk-l': `${outer[0]}px`,
+				'--pk-t': `${outer[1]}px`,
+				'--pk-w': `${Math.max(6, outer[2] - outer[0])}px`,
+				'--pk-h': `${Math.max(6, outer[3] - outer[1])}px`,
 			});
 			if (entry.status === 'stale') mark.addClass('is-stale');
 			if (entry.id === this.panelEntryId) mark.addClass('is-active');
@@ -1209,10 +1209,10 @@ export class PickmePdfView extends FileView {
 				// 子形状相对外接矩形定位：外接矩形自己不收指针事件，空白处点不开批注
 				const box = mark.createDiv({ cls: shape.kind === 'line' ? 'pickme-pdf-band' : 'pickme-pdf-box' });
 				box.setCssProps({
-					left: `${screen[0] - outer[0]}px`,
-					top: `${screen[1] - outer[1]}px`,
-					width: `${Math.max(2, screen[2] - screen[0])}px`,
-					height: `${Math.max(2, screen[3] - screen[1])}px`,
+					'--pk-l': `${screen[0] - outer[0]}px`,
+					'--pk-t': `${screen[1] - outer[1]}px`,
+					'--pk-w': `${Math.max(2, screen[2] - screen[0])}px`,
+					'--pk-h': `${Math.max(2, screen[3] - screen[1])}px`,
 				});
 			}
 			// 每条批注一个「把手」：只有把手上能点开，形状本身永远不吃指针。
@@ -1382,10 +1382,10 @@ export class PickmePdfView extends FileView {
 	private updateMarquee(slot: PageSlot, a: Point, b: Point): void {
 		const rect = dragRect(a, b);
 		slot.marquee.setCssProps({
-			left: `${rect[0]}px`,
-			top: `${rect[1]}px`,
-			width: `${rect[2] - rect[0]}px`,
-			height: `${rect[3] - rect[1]}px`,
+			'--pk-l': `${rect[0]}px`,
+			'--pk-t': `${rect[1]}px`,
+			'--pk-w': `${rect[2] - rect[0]}px`,
+			'--pk-h': `${rect[3] - rect[1]}px`,
 		});
 	}
 
@@ -1450,7 +1450,7 @@ export class PickmePdfView extends FileView {
 		}
 		const rect = noteRectAt(this.toPdfPoint(slot, point), this.viewSizeOf(slot));
 		const screen = pdfToScreenRect(rect, this.slotSize(slot), this.viewSizeOf(slot), this.rotationOf(slot));
-		drag.mark.setCssProps({ left: `${screen[0]}px`, top: `${screen[1]}px` });
+		drag.mark.setCssProps({ '--pk-l': `${screen[0]}px`, '--pk-t': `${screen[1]}px`  });
 	}
 
 	/** 松手：动过就写回新位置，没动就按点击打开这条批注 */

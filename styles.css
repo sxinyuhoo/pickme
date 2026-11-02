@@ -1843,6 +1843,51 @@ body.pickme-mark-border .pickme-mark {
 }
 
 
+/* ===== 位置与尺寸统一走自定义属性 =====
+   社区规则只允许 setCssProps 写 --* 变量（写 left/width 这类真实属性会被判违规），
+   所以代码里传 --pk-l/--pk-t/--pk-w/--pk-h，由下面这些规则消费。
+   注意：只覆盖确实用变量定位的元素，便利贴与标签仍用自身的 inset: 0。 */
+.pickme-pdf-mark,
+.pickme-pdf-band,
+.pickme-pdf-box,
+.pickme-pdf-marquee,
+.pickme-pdf-ghost {
+	left: var(--pk-l);
+	top: var(--pk-t);
+	width: var(--pk-w);
+	height: var(--pk-h);
+}
+
+.pickme-pdf-sheet,
+.pickme-pdf-canvas,
+.pickme-pdf-overlay {
+	width: var(--pk-w);
+	height: var(--pk-h);
+}
+
+.pickme-pdf-toc-item {
+	padding-left: var(--pk-pad, 8px);
+}
+
+.pickme-panel {
+	left: var(--pk-l);
+	top: var(--pk-t);
+	width: var(--pk-w, auto);
+}
+
+/* 批注层级用类名表达（原本写内联 z-index） */
+.pickme-pdf-mark.is-mark-band {
+	z-index: 1;
+}
+
+.pickme-pdf-mark.is-mark-box {
+	z-index: 2;
+}
+
+.pickme-pdf-mark.is-mark-sticky {
+	z-index: 3;
+}
+
 /* 批注本体：荧光带和便利贴按元素命中（指针压在带子/图标上才算），
    框的内部不吃指针——只有贴着边框才算命中（判定在 pdfView.hitTest 里做），
    这样任何模式下都能在已有批注上落笔。 */

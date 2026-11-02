@@ -2,6 +2,13 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.5.6
+
+- 彻底消掉 `no-static-styles-assignment`：社区规则只允许 `setCssProps` 写**自定义属性**（`--` 开头），写 `left` / `width` / `z-index` 这类真实属性同样算违规
+  - 批注位置与尺寸（`pdfView.ts`、`pdfjs.ts`、`askPanel.ts` 共 15 处）改为传 `--pk-l` / `--pk-t` / `--pk-w` / `--pk-h`，由样式表统一消费
+  - 批注层级不再写内联 `z-index`，改为类名 `is-mark-band` / `is-mark-box` / `is-mark-sticky`
+  - 目录缩进改为 `--pk-pad`，样式表里 `padding-left: var(--pk-pad, 8px)`
+
 ## 1.5.5
 
 - **修数据合并 bug**：在框选批注上画荧光笔时，这一笔会被「续划合并」并进那条框（变成同一条批注的第二个形状）——于是删框会把荧光一起删掉，颜色也叠成一块。现在只允许并进**荧光高亮**之间，框上画荧光一律新建独立批注，删谁都互不影响
