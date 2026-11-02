@@ -278,9 +278,7 @@ export class PickmePdfView extends FileView {
 	 * 停在框上就是框、停在没被盖住的荧光带上就是荧光带——和眼睛看到的层次一致。
 	 */
 	private updateHover(slot: PageSlot, event: PointerEvent): void {
-		if (this.plugin.settings.pdfAnnotateMode !== 'none') {
-			if (this.hoverEntryId === null) return;
-		}
+		// 任何模式都更新：举着工具时也要能看出「这条能点」（框只认边框、荧光认文字）
 		const top = this.pickByPriority(this.hitTest(slot, event))[0] ?? null;
 		const id = top?.getAttribute('data-pickme-id') ?? null;
 		if (id === this.hoverEntryId) return;
@@ -307,7 +305,7 @@ export class PickmePdfView extends FileView {
 	 */
 	private hitTest(slot: PageSlot, event: PointerEvent): HTMLElement[] {
 		const hit = this.marksAt(slot, event, null);
-		const tol = 5; // 边框的容差（像素）：太细不好点，太宽又会挡住落笔
+		const tol = 6; // 边框的容差（像素）：太细不好点，太宽又会挡住落笔
 		for (const mark of slot.overlay.querySelectorAll<HTMLElement>('.pickme-pdf-mark')) {
 			if (hit.includes(mark)) continue;
 			const box = mark.querySelector('.pickme-pdf-box');
