@@ -1843,6 +1843,144 @@ body.pickme-mark-border .pickme-mark {
 }
 
 
+/* ===== 选中正文后的悬浮入口 =====
+   跟着选区走的小胶囊：手机没有右键菜单，桌面也少记一个入口。 */
+.pickme-selection-bubble {
+	position: fixed;
+	left: var(--pk-l, 0px);
+	top: var(--pk-t, 0px);
+	z-index: var(--layer-popover, 30);
+	display: none;
+}
+
+.pickme-selection-bubble.is-visible {
+	display: block;
+}
+
+.pickme-selection-ask {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 30px;
+	padding: 0 11px;
+	border: 1px solid var(--pk-line);
+	border-radius: var(--pk-pill);
+	background: var(--pk-surface);
+	color: var(--pk-ink);
+	font-size: var(--pk-fs-ctl);
+	font-weight: 500;
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+	cursor: pointer;
+	transition: var(--pk-t);
+}
+
+.pickme-selection-ask:hover {
+	border-color: var(--pk-acc-line);
+	color: var(--pk-acc-ink);
+	background: var(--pk-acc-soft);
+}
+
+.pickme-selection-icon {
+	display: inline-flex;
+}
+
+.pickme-selection-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+body.is-mobile .pickme-selection-ask {
+	height: 34px;
+	padding: 0 13px;
+	font-size: var(--pk-fs);
+}
+
+/* ===== 移动端（触屏）=====
+   桌面靠悬停暗示「这里能点」，触屏没有悬停，所以：面板改成贴着底部的抽屉、
+   按钮放大到手指能点、PDF 页面上按模式接管手势。 */
+body.is-mobile .pickme-panel {
+	left: 12px;
+	right: 12px;
+	top: auto;
+	bottom: calc(var(--pk-kb, 0px) + 12px + env(safe-area-inset-bottom, 0px));
+	width: auto;
+	max-height: min(58vh, 520px);
+	border-radius: 14px;
+}
+
+/* 抽屉顶部的抓手，明确「这是一层可以收起来的东西」 */
+body.is-mobile .pickme-panel::before {
+	content: '';
+	position: absolute;
+	top: 6px;
+	left: 50%;
+	width: 36px;
+	height: 4px;
+	margin-left: -18px;
+	border-radius: 999px;
+	background: var(--pk-line-strong, rgba(128, 128, 128, 0.35));
+}
+
+body.is-mobile .pickme-panel-header {
+	padding-top: 14px;
+}
+
+/* 触屏上按钮至少 32px 高，行内小按钮也不例外 */
+body.is-mobile .pickme-panel button,
+body.is-mobile .pickme-sidebar button,
+body.is-mobile .pickme-index button,
+body.is-mobile .pickme-pdf-toolbar button,
+body.is-mobile .pickme-pdf-toolbar .pickme-pdf-tool {
+	min-height: 32px;
+	min-width: 32px;
+}
+
+body.is-mobile .pickme-index-entry {
+	padding-top: 10px;
+	padding-bottom: 10px;
+}
+
+/* 触屏没有 hover：行内操作按钮一直显形，否则根本摸不到 */
+body.is-mobile .pickme-index-rowdel {
+	opacity: 1;
+}
+
+/* PDF：浏览态单指滚动、双指缩放；举着工具时把手势交给插件，否则浏览器会把这一笔当成滚动 */
+body.is-mobile .pickme-pdf-browse .pickme-pdf-overlay {
+	touch-action: pan-y pinch-zoom;
+}
+
+body.is-mobile .pickme-pdf-tool-active .pickme-pdf-overlay {
+	touch-action: none;
+}
+
+/* 便利贴在触屏上放大一点，手指才点得准 */
+body.is-mobile .pickme-pdf-sticky {
+	width: 26px;
+	height: 26px;
+}
+
+/* 手机上工具栏不换行（换行要吃掉近五分之一的屏幕），改成单行横向滚动 */
+body.is-mobile .pickme-pdf-toolbar {
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: none;
+	padding-bottom: 2px;
+}
+
+body.is-mobile .pickme-pdf-toolbar::-webkit-scrollbar {
+	display: none;
+}
+
+body.is-mobile .pickme-pdf-toolbar > * {
+	flex: 0 0 auto;
+}
+
+body.is-mobile .pickme-pdf-sep {
+	height: 18px;
+}
+
 /* ===== 位置与尺寸统一走自定义属性 =====
    社区规则只允许 setCssProps 写 --* 变量（写 left/width 这类真实属性会被判违规），
    所以代码里传 --pk-l/--pk-t/--pk-w/--pk-h，由下面这些规则消费。

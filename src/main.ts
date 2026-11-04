@@ -7,6 +7,7 @@ import { TemplateStore } from './store/templateStore.ts';
 import { activateSidebar, PickmeSidebarView, VIEW_TYPE_PICKME } from './ui/sidebarView.ts';
 import { PickmeIndexView, VIEW_TYPE_PICKME_INDEX } from './ui/indexView.ts';
 import { openAskPanel } from './ui/askPanel.ts';
+import { SelectionBubble } from './ui/selectionBubble.ts';
 import type { AskPanelAnchor, AskSink } from './ui/askPanel.ts';
 import { PickmePdfView, VIEW_TYPE_PICKME_PDF } from './pdf/pdfView.ts';
 import { buildEditorExtension, buildPostProcessor, cmView, selectionOffsets } from './render/anchorRenderer.ts';
@@ -55,6 +56,7 @@ export default class PickmePlugin extends Plugin {
 	/** PDF 打开方式：registry 注册扩展名 / intercept 打开后换视图 / off 不接管 */
 	private pdfTakeover: 'registry' | 'intercept' | 'off' = 'off';
 	private lastAnnotationDir = '';
+	private selectionBubble: SelectionBubble | null = null;
 	/** 批注变动后合并写索引笔记的定时器 */
 	private indexTimer: number | null = null;
 
@@ -80,6 +82,8 @@ export default class PickmePlugin extends Plugin {
 		registerCommands(this);
 		this.applyHighlightColor();
 		this.applyMarkStyle();
+		// 选中正文后浮出「提问或批注」：手机没有右键菜单，桌面也少记一个入口
+		this.selectionBubble = new SelectionBubble(this);
 
 		// 老版本的默认位置改成插件自管的位置：只在用户没动过（还是老默认值）时改，
 		// 旧文件一律不动，也不删——需要清理的话交给用户自己决定
@@ -162,6 +166,8 @@ export default class PickmePlugin extends Plugin {
 	}
 
 	onunload(): void {
+		this.selectionBubble?.destroy();
+		this.selectionBubble = null;
 		// 滚动记忆是节流落盘的，退出前补一次，别把最后几页的进度丢了
 		this.flushSettingsSave();
 		// 卸载时把标记样式类摘掉，别留在 body 上
@@ -443,7 +449,6 @@ export default class PickmePlugin extends Plugin {
 				return;
 			} catch (error) {
 				// 注册失败不致命，继续走接管
-				console.warn('pickme：注册 pdf 扩展名失败，改用接管方式', error);
 			}
 		}
 		this.pdfTakeover = 'intercept';
@@ -478,7 +483,6 @@ export default class PickmePlugin extends Plugin {
 				active: true,
 			});
 		} catch (error) {
-			console.warn('pickme：接管 PDF 打开失败，保持内置查看器', error);
 		}
 	}
 
@@ -638,22 +642,30 @@ export default class PickmePlugin extends Plugin {
 	async annotateSelection(view: MarkdownView, silent = false): Promise<AnnotationEntry | null> {
 		const file = view.file;
 		if (!file) return null;
-		const offsets = selectionOffsets(view);
-		if (!offsets) {
+		const resolved = await this.resolveSelection(view);
+		if (!resolved) {
 			if (!silent) new Notice(t('pickme：请先选中一段文字'));
 			return null;
 		}
-		const text = view.editor.getValue();
+		const offsets = { from: resolved.from, to: resolved.to };
+		const text = resolved.text;
 		const selection = text.slice(offsets.from, offsets.to);
 		const id = this.uniqueAnchorId(text);
 		const tag = anchorTag(id, this.settings.tagName);
 
-		cmView(view.editor).dispatch({
-			changes: [
-				{ from: offsets.from, insert: tag },
-				{ from: offsets.to, insert: tag },
-			],
-		});
+		if (resolved.via === 'editor') {
+			cmView(view.editor).dispatch({
+				changes: [
+					{ from: offsets.from, insert: tag },
+					{ from: offsets.to, insert: tag },
+				],
+			});
+		} else {
+			// 阅读视图没有编辑器光标，只能直接改文件：一次 process 里完成，避免中间态落盘
+			await this.app.vault.process(file, (data) =>
+				data.slice(0, offsets.from) + tag + data.slice(offsets.from, offsets.to) + tag + data.slice(offsets.to),
+			);
+		}
 
 		const entry: AnnotationEntry = {
 			id,
@@ -676,6 +688,32 @@ export default class PickmePlugin extends Plugin {
 		}
 		if (!silent) new Notice(t('pickme：已添加批注 {v0}', { v0: id }));
 		return entry;
+	}
+
+	/**
+	 * 选区落在哪儿：编辑态用编辑器光标（准）；
+	 * 阅读视图没有光标，只能拿选中文字去原文里找——只认唯一匹配，
+	 * 出现多次就拒绝，绑错锚点比不绑更糟。
+	 */
+	private async resolveSelection(
+		view: MarkdownView,
+	): Promise<{ from: number; to: number; text: string; via: 'editor' | 'vault' } | null> {
+		// 阅读视图没有挂 CM6，编辑器光标可能还是上次留下的旧位置——只认 DOM 选区
+		if (view.getMode() !== 'preview') {
+			const offsets = selectionOffsets(view);
+			if (offsets) return { ...offsets, text: view.editor.getValue(), via: 'editor' };
+		}
+		const file = view.file;
+		const selected = window.getSelection()?.toString().trim() ?? '';
+		if (!file || !selected) return null;
+		const text = await this.app.vault.read(file);
+		const first = text.indexOf(selected);
+		if (first < 0) return null;
+		if (text.indexOf(selected, first + 1) >= 0) {
+			new Notice(t('这段文字在原文里出现不止一次，请切到编辑模式后重选'));
+			return null;
+		}
+		return { from: first, to: first + selected.length, text, via: 'vault' };
 	}
 
 	private uniqueAnchorId(text: string): string {

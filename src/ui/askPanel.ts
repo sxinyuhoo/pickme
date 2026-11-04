@@ -1,4 +1,4 @@
-import { Component, MarkdownRenderer, TFile } from 'obsidian';
+import { Component, MarkdownRenderer, Platform, TFile } from 'obsidian';
 import { t, templateLabel } from '../i18n.ts';
 import type PickmePlugin from '../main.ts';
 import { parseAnnotationDoc } from '../core/annotationDoc.ts';
@@ -162,6 +162,10 @@ export class AskPanel implements AskSink {
 		this.applyPosition();
 		window.addEventListener('scroll', this.onViewportChange, true);
 		window.addEventListener('resize', this.onViewportChange);
+		// 手机上是底部抽屉：软键盘弹起时可视区会变矮，抽屉得跟着抬起来，否则输入框被盖住
+		window.visualViewport?.addEventListener('resize', this.onKeyboardChange);
+		window.visualViewport?.addEventListener('scroll', this.onKeyboardChange);
+		this.applyKeyboardInset();
 		(this.noteInput ?? this.questionInput)?.focus();
 	}
 
@@ -175,6 +179,8 @@ export class AskPanel implements AskSink {
 		this.closed = true;
 		window.removeEventListener('scroll', this.onViewportChange, true);
 		window.removeEventListener('resize', this.onViewportChange);
+		window.visualViewport?.removeEventListener('resize', this.onKeyboardChange);
+		window.visualViewport?.removeEventListener('scroll', this.onKeyboardChange);
 		this.layer?.remove();
 		this.layer = null;
 		this.root = null;
@@ -567,6 +573,19 @@ export class AskPanel implements AskSink {
 		const stuck = max <= 0 || (event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom);
 		if (stuck) event.preventDefault();
 	};
+
+	/** 手机软键盘的高度：可视区比窗口矮多少，抽屉就往上抬多少 */
+	private onKeyboardChange = (): void => {
+		this.applyKeyboardInset();
+	};
+
+	private applyKeyboardInset(): void {
+		const root = this.root;
+		if (!root || !Platform.isMobile) return;
+		const viewport = window.visualViewport;
+		const covered = viewport ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0;
+		root.setCssProps({ '--pk-kb': `${Math.round(covered)}px` });
+	}
 
 	private onViewportChange = (event?: Event): void => {
 		// 面板自己就是滚动容器，捕获阶段会收到所有元素上的 scroll：

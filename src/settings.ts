@@ -83,6 +83,8 @@ export interface PickmeSettings {
 	createEmptyAnnotationFile: boolean;
 	/** 上一次的锚点标签名，用于批量替换 */
 	previousTagName: string;
+	/** 手机上那条「怎么点开批注」的提示只弹一次 */
+	mobileHintShown: boolean;
 }
 
 /** 视觉标记样式 */
@@ -131,6 +133,7 @@ export const DEFAULT_SETTINGS: PickmeSettings = {
 	markStyle: 'background',
 	createEmptyAnnotationFile: false,
 	previousTagName: '',
+	mobileHintShown: false,
 };
 
 /** 设置项的存储键：就是 PickmeSettings 的字段名，交给 SettingDefinitionItem<K> 做编译期检查 */

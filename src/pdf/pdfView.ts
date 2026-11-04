@@ -1,4 +1,4 @@
-import { FileView, Notice, setIcon, TFile, WorkspaceLeaf } from 'obsidian';
+import { FileView, Notice, Platform, setIcon, TFile, WorkspaceLeaf } from 'obsidian';
 import { t, tKey } from '../i18n.ts';
 import type PickmePlugin from '../main.ts';
 import { loadPdf, renderPage } from './pdfjs.ts';
@@ -171,6 +171,18 @@ export class PickmePdfView extends FileView {
 		this.buildShell();
 		this.bindKeys();
 		await this.loadDocument(file);
+		this.showMobileHintOnce();
+	}
+
+	/**
+	 * 触屏没有「悬停才变手型」这条暗示，头一次用不知道批注能点。
+	 * 只弹一次，之后靠界面本身。
+	 */
+	private showMobileHintOnce(): void {
+		if (!Platform.isMobile || this.plugin.settings.mobileHintShown) return;
+		this.plugin.settings.mobileHintShown = true;
+		void this.plugin.saveSettings();
+		new Notice(t('手机上：点批注的边框、荧光带或便利贴图标即可打开；选一种标注工具后单指划线、双指缩放。'), 7000);
 	}
 
 	async onUnloadFile(): Promise<void> {
@@ -754,6 +766,7 @@ export class PickmePdfView extends FileView {
 			this.updateViewport(true);
 			this.restoreLastPage();
 			void this.buildToc();
+			this.fitWidthOnMobile();
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			this.setStatus(t('载入失败：{v0}', { v0: message }));
@@ -1086,6 +1099,18 @@ export class PickmePdfView extends FileView {
 		if (scroll) scroll.scrollTop = (this.tops[anchorPage - 1] ?? 0) + anchorOffset * ratio;
 		this.updateViewport(true);
 		this.refreshZoomLabel();
+	}
+
+	/** 手机上首次打开直接铺满宽度：竖屏看 PDF 时左右拖动是最烦的一件事 */
+	private fitWidthOnMobile(): void {
+		if (!Platform.isMobile) return;
+		const first = this.slots[0];
+		if (!first) return;
+		const available = first.sheet.parentElement?.clientWidth ?? 0;
+		if (available <= 0) return;
+		const width = first.base ? first.base[0] : 0;
+		if (width <= 0) return;
+		this.setScale(available / width);
 	}
 
 	private async fitWidth(): Promise<void> {

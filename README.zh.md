@@ -31,7 +31,7 @@ PDF 页面上画过的标记都留在原处，点它就能重新打开那条批�
 - **社区插件**（上架后）：设置 → 第三方插件 → 浏览 → 搜 *Pick Me* → 安装 → 启用。
 - **BRAT**（上架前的内测版）：先装 [BRAT](https://github.com/TfTHacker/obsidian42-brat) 插件，在它的设置里 Add beta plugin 填 `<你的 GitHub 用户名>/pickme`，之后一键更新。
 - **手动**：把 `main.js`、`manifest.json`、`styles.css` 放进 `<库>/.obsidian/plugins/pickme/`，重启 Obsidian 后在设置里启用。仓库发版时会把这几个文件挂在 GitHub Release 上，直接下即可。
-- 桌面端插件（`isDesktopOnly`），移动端用不了。
+- 桌面端与手机端（iOS / Android）都能用。触屏没有悬停，所以改成点按：点框的边、荧光带或便利贴图标即可打开那条批注；选中标注工具后由页面接管手势，单指划线、双指缩放，切回指针就正常滚动。提问面板在手机上变成贴底抽屉并跟随软键盘，选中正文会浮出提问按钮（手机没有右键菜单）。
 
 ## 网络与隐私
 
@@ -306,7 +306,8 @@ src/generated/内联的 pdf.js CMap 与标准字体（由 scripts/inline-pdf-ass
 ## 已知限制
 
 - pdf.js 的 CMap 与标准字体已内联进 `main.js`（构建时由 `npm run assets` 生成，整体 gzip 打包、用到时惰性解压一次），代价是 `main.js` 约 3.8 MB。
-- 不支持移动端：自带 pdf.js 查看器与区域截图都依赖桌面端能力。
+- 触屏没有悬停，批注靠点（框的边、荧光带、便利贴图标）打开。
+- 手机上请求走 `requestUrl`，它不支持流式，所以回答是一次性出现的，不是逐字打字。
 - 窗口被最小化或被其他窗口完全遮住时，Chromium 会停掉 requestAnimationFrame，pdf.js 的渲染也跟着停（页面暂时画不出来）。切回前台会自动补画；若状态栏提示渲染超时，点它旁边的「重试」即可。
 - 连续滚动下页面尺寸在打开时就全部量好，所以首次打开很长的 PDF（上千页）会多花一点准备时间；滚动条长度从第一帧起就是准的。
 - 锚点标签在源码模式下可见（`<pickme id="xxxxxx"></pickme>`），编辑视图与阅读视图里都不可见。

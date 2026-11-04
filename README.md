@@ -34,7 +34,7 @@ Drag a rectangle over a PDF page — the text of that region and its screenshot 
 - **BRAT** (beta builds, works before publication): install [BRAT](https://github.com/TfTHacker/obsidian42-brat), then *Add beta plugin* → `<your-github-user>/pickme`.
 - **Manual**: put `main.js`, `manifest.json` and `styles.css` into `<vault>/.obsidian/plugins/pickme/`, then enable it in Settings.
 
-Desktop only (`isDesktopOnly`) — the built-in pdf.js viewer and region screenshots need desktop capabilities.
+Works on desktop and on Obsidian for iOS / Android. On a touch screen there is no hover, so you tap instead: tap a region's edge, a highlight band or a sticky-note icon to open that annotation. With a tool selected the page takes over the gesture — one finger draws, two fingers pinch; switch back to the pointer to scroll. The ask panel becomes a bottom sheet that follows the keyboard. Selecting text in a note shows a small ask button, since mobile has no right-click.
 
 ## Network use and privacy
 
@@ -152,7 +152,8 @@ One line per release; the full notes live in [CHANGELOG.md](./CHANGELOG.md).
 ## Limitations
 
 - `main.js` is about 3.8 MB because pdf.js's CMap tables and standard fonts are inlined — the price of needing no network for PDF rendering. They ship as one gzip stream per group and are decompressed once, on demand, so the download stays as small as this feature allows.
-- Desktop only.
+- No hover on touch screens: annotations open by tapping their edge, band or icon rather than by hovering.
+- On mobile the request path goes through `requestUrl`, which cannot stream — the answer appears in one piece instead of typing itself out.
 - When the window is minimized or fully occluded, Chromium stops `requestAnimationFrame` and pdf.js rendering pauses; it repaints when the window returns.
 - Anchor tags are visible in source mode (`<pickme id="xxxxxx"></pickme>`) but hidden in editing and reading views.
 - Highlights rely on the reading-view post-processor and a CodeMirror extension; if another plugin decorates the same text, Obsidian's render wins.

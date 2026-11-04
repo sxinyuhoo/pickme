@@ -1,6 +1,6 @@
 /** OpenAI 兼容的对话接口，支持流式与图片输入 */
 
-import { requestUrl } from 'obsidian';
+import { Platform, requestUrl } from 'obsidian';
 import type { RequestUrlResponse } from 'obsidian';
 import { currentLanguage, t } from '../i18n.ts';
 
@@ -222,7 +222,9 @@ export async function chat(
 	request: ChatRequest,
 	onDelta?: (delta: string, full: string) => void,
 ): Promise<ChatResult> {
-	const mode = request.transport ?? 'auto';
+	// 手机上浏览器 fetch 一定被跨域掐掉，再去试一遍只是白等一轮超时；
+	// requestUrl 由主进程发出，是移动端唯一可靠的通道（代价是没有流式）。
+	const mode = request.transport === 'auto' && Platform.isMobile ? 'requestUrl' : (request.transport ?? 'auto');
 	const run = async (withThinking: boolean): Promise<ChatResult> => {
 		if (mode === 'requestUrl') {
 			return chatViaRequestUrl(request, onDelta, withThinking);
@@ -239,7 +241,6 @@ export async function chat(
 			);
 		} catch (error) {
 			if (mode !== 'auto' || emitted !== '' || !isNetworkError(error)) throw error;
-			console.warn('pickme：浏览器 fetch 被拦，改用 Obsidian requestUrl 重发', error);
 			return chatViaRequestUrl(request, onDelta, withThinking);
 		}
 	};
@@ -249,7 +250,6 @@ export async function chat(
 	} catch (error) {
 		// 通用 OpenAI 兼容接口不认 thinking 字段，去掉它再发一次，别让深度思考开关把请求打死
 		if (!isThinkingParamError(error)) throw error;
-		console.warn('pickme：接口不认 thinking 参数，去掉后重发一次', error);
 		return run(false);
 	}
 }
@@ -439,7 +439,6 @@ export async function listModels(
 			return parse(response.json ?? JSON.parse(response.text));
 		} catch (error) {
 			if (transport === 'requestUrl') throw error;
-			console.warn('pickme：requestUrl 拉取模型失败，改用 fetch 再试一次', error);
 		}
 	}
 
@@ -466,6 +465,8 @@ const EXPLICIT_LANGUAGE = /(中文|汉语|简体|繁体|英文|英语|日文|日
 export function buildSystemPrompt(withContext: boolean, question = ''): string {
 	const base = t('你是一个技术助手，正在为阅读中的文档做批注。回答要具体、可核对，不要重复原文，不要编造原文里没有的信息。');
 	const parts = [base];
+	// 所有提问（含内置模板）都追加这一条：默认给结论式的短答，需要展开时由用户再要
+	parts.push(t('回答要精炼：先用一句话给结论，再给必要的依据，通常不超过一百二十字；只有用户明确要求展开时才写长。'));
 	if (withContext) parts.push(t('用户会给出选区，可能还有上下文片段。'));
 	// 用户自己在问题里指定了语言就听他的
 	if (!EXPLICIT_LANGUAGE.test(question)) parts.push(currentLanguage() === 'zh' ? t('请用中文回答。') : t('请用英文回答。'));
