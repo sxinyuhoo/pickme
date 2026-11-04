@@ -1960,25 +1960,32 @@ body.is-mobile .pickme-pdf-sticky {
 	height: 26px;
 }
 
-/* 手机上工具栏不换行（换行要吃掉近五分之一的屏幕），改成单行横向滚动 */
-body.is-mobile .pickme-pdf-toolbar {
-	flex-wrap: nowrap;
-	overflow-x: auto;
-	overflow-y: hidden;
-	scrollbar-width: none;
-	padding-bottom: 2px;
+/* 手机上工具栏只留「目录 / 三种标注 / 高亮开关」：
+   翻页靠滚动、缩放靠双指，这些按钮留着会把标注工具挤出屏幕（原来整整占满一行，工具点不到）。 */
+body.is-mobile .pickme-pdf-desk-only,
+body.is-mobile .pickme-pdf-page,
+body.is-mobile .pickme-pdf-total,
+body.is-mobile .pickme-pdf-zoom,
+body.is-mobile .pickme-pdf-sep {
+	display: none;
 }
 
-body.is-mobile .pickme-pdf-toolbar::-webkit-scrollbar {
-	display: none;
+body.is-mobile .pickme-pdf-toolbar {
+	flex-wrap: wrap;
+	row-gap: 4px;
+	padding-bottom: 2px;
 }
 
 body.is-mobile .pickme-pdf-toolbar > * {
 	flex: 0 0 auto;
 }
 
-body.is-mobile .pickme-pdf-sep {
-	height: 18px;
+/* 状态文字让位：挤不下时省略，别把按钮顶到看不见的地方 */
+body.is-mobile .pickme-pdf-status {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 /* ===== 位置与尺寸统一走自定义属性 =====

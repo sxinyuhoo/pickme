@@ -170,6 +170,12 @@ export class PickmePdfView extends FileView {
 		this.pageNumber = 1;
 		this.buildShell();
 		this.bindKeys();
+		// 触屏上「随手一点」很容易多出一条批注：手机上每次打开都先回到浏览态，
+		// 要用工具得自己去点（只改内存里的值，不动用户存下来的偏好）
+		if (Platform.isMobile) {
+			this.plugin.settings.pdfAnnotateMode = 'none';
+			this.refreshModeButtons();
+		}
 		await this.loadDocument(file);
 		this.showMobileHintOnce();
 	}
@@ -580,7 +586,7 @@ export class PickmePdfView extends FileView {
 		this.addToolbarSep(toolbar);
 
 		// 翻页：两个箭头夹一个页码框，右边跟「/ 共 N 页」
-		this.iconButton(toolbar, 'chevron-left', tKey('上一页'), () => this.scrollToPage(this.pageNumber - 1));
+		this.iconButton(toolbar, 'chevron-left', tKey('上一页'), () => this.scrollToPage(this.pageNumber - 1), 'pickme-pdf-desk-only');
 		this.pageInput = toolbar.createEl('input', { cls: 'pickme-pdf-page', type: 'text' });
 		this.pageInput.value = String(this.pageNumber);
 		this.pageInput.onchange = () => {
@@ -588,16 +594,16 @@ export class PickmePdfView extends FileView {
 			this.scrollToPage(Number.isFinite(parsed) ? parsed : 1);
 		};
 		this.pageTotalEl = toolbar.createSpan({ cls: 'pickme-pdf-total' });
-		this.iconButton(toolbar, 'chevron-right', tKey('下一页'), () => this.scrollToPage(this.pageNumber + 1));
+		this.iconButton(toolbar, 'chevron-right', tKey('下一页'), () => this.scrollToPage(this.pageNumber + 1), 'pickme-pdf-desk-only');
 		this.addToolbarSep(toolbar);
 
 		// 缩放：减 / 百分比（点一下回 100%）/ 加 / 适应宽度，都是图标
-		this.iconButton(toolbar, 'zoom-out', tKey('缩小'), () => this.setScale(this.scale - 0.2));
+		this.iconButton(toolbar, 'zoom-out', tKey('缩小'), () => this.setScale(this.scale - 0.2), 'pickme-pdf-desk-only');
 		this.zoomButton = toolbar.createEl('button', { cls: 'pickme-pdf-zoom' });
 		this.zoomButton.onclick = () => this.setScale(1);
 		this.labelButtons.push({ el: this.zoomButton, key: () => tKey('点击恢复 100%') });
-		this.iconButton(toolbar, 'zoom-in', tKey('放大'), () => this.setScale(this.scale + 0.2));
-		this.iconButton(toolbar, 'chevrons-left-right', tKey('适应宽度'), () => void this.fitWidth());
+		this.iconButton(toolbar, 'zoom-in', tKey('放大'), () => this.setScale(this.scale + 0.2), 'pickme-pdf-desk-only');
+		this.iconButton(toolbar, 'chevrons-left-right', tKey('适应宽度'), () => void this.fitWidth(), 'pickme-pdf-desk-only');
 		this.addToolbarSep(toolbar);
 
 		// 标注方式：荧光笔（拖一笔吸附到文字行）｜框选（拖出一块区域）
@@ -1102,14 +1108,17 @@ export class PickmePdfView extends FileView {
 	}
 
 	/** 手机上首次打开直接铺满宽度：竖屏看 PDF 时左右拖动是最烦的一件事 */
-	private fitWidthOnMobile(): void {
+	private fitWidthOnMobile(attempt = 0): void {
 		if (!Platform.isMobile) return;
 		const first = this.slots[0];
 		if (!first) return;
 		const available = first.sheet.parentElement?.clientWidth ?? 0;
-		if (available <= 0) return;
 		const width = first.base ? first.base[0] : 0;
-		if (width <= 0) return;
+		if (available <= 0 || width <= 0) {
+			// 视图刚建好时还量不到宽度，稍等一拍再试（最多三次，别转圈）
+			if (attempt < 3) window.setTimeout(() => this.fitWidthOnMobile(attempt + 1), 300);
+			return;
+		}
 		this.setScale(available / width);
 	}
 
