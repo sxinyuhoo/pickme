@@ -1096,6 +1096,11 @@ export class PickmePdfView extends FileView {
 	}
 
 	private onTouchStart(event: TouchEvent): void {
+		// 举着标注工具时，单指手势全部归插件：不 preventDefault 的话，
+		// 系统会把这一划当成「从边缘拉出侧边栏」之类的系统手势
+		if (this.plugin.settings.pdfAnnotateMode !== 'none' && event.cancelable) {
+			event.preventDefault();
+		}
 		if (event.touches.length !== 2) return;
 		const [a, b] = [event.touches[0], event.touches[1]];
 		const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
@@ -1107,6 +1112,9 @@ export class PickmePdfView extends FileView {
 	}
 
 	private onTouchMove(event: TouchEvent): void {
+		if (this.plugin.settings.pdfAnnotateMode !== 'none' && event.cancelable) {
+			event.preventDefault();
+		}
 		const pinch = this.pinch;
 		if (!pinch || event.touches.length !== 2) return;
 		event.preventDefault();

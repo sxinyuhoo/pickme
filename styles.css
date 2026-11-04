@@ -217,6 +217,9 @@ body.theme-dark {
 body .pickme-pdf-toolbar .pickme-pdf-page,
 body.is-mobile .pickme-pdf-toolbar .pickme-pdf-page {
 	width: 38px;
+	height: 28px;
+	/* Obsidian 给输入框的默认内边距是 4px 16px，38px 宽下只剩几个像素装数字，数字会被切掉一半 */
+	padding: 0 2px;
 	flex: 0 0 auto;
 	text-align: center;
 	font-family: var(--font-interface);
@@ -1907,45 +1910,15 @@ body.is-mobile .pickme-panel {
 	left: 12px;
 	right: 12px;
 	top: auto;
-	bottom: calc(var(--pk-kb, 0px) + 12px + env(safe-area-inset-bottom, 0px));
+	bottom: calc(var(--pk-kb, 0px) + var(--pk-bar, 52px) + 12px + env(safe-area-inset-bottom, 0px));
 	width: auto;
 	max-height: min(58vh, 520px);
 	border-radius: 14px;
 }
 
-/* 抽屉顶部的抓手：真的能抓——按住头部往下甩收起、往上拖展开 */
+/* 抽屉固定贴在底部，不跟随拖动；底部留出 Obsidian 自己那条工具栏的位置（高度由 JS 量出来） */
 body.is-mobile .pickme-panel-head {
-	position: relative;
-	padding-top: 16px;
-	touch-action: none;
-	cursor: grab;
-}
-
-body.is-mobile .pickme-panel-head::before {
-	content: '';
-	position: absolute;
-	top: 6px;
-	left: 50%;
-	width: 36px;
-	height: 4px;
-	margin-left: -18px;
-	border-radius: 999px;
-	background: var(--pk-line);
-}
-
-body.is-mobile .pickme-panel {
-	transform: translateY(var(--pk-drag, 0px));
-	transition: transform 0.18s ease;
-}
-
-body.is-mobile .pickme-panel.is-dragging,
-body.is-mobile .pickme-panel.is-dragging .pickme-panel-head {
-	transition: none;
-	cursor: grabbing;
-}
-
-body.is-mobile .pickme-panel.is-expanded {
-	max-height: min(88vh, 720px);
+	padding-top: 4px;
 }
 
 /* 触屏上按钮至少 32px 高，行内小按钮也不例外 */
