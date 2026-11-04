@@ -213,7 +213,12 @@ body.theme-dark {
 .pickme-panel select,
 .pickme-question,
 .pickme-note-input,
-.pickme-pdf-page {
+/* 权重得压过 Obsidian 自己的 input[type="text"]（它是 100% 宽），否则页码框会被拉满整条工具栏 */
+body .pickme-pdf-toolbar .pickme-pdf-page,
+body.is-mobile .pickme-pdf-toolbar .pickme-pdf-page {
+	width: 38px;
+	flex: 0 0 auto;
+	text-align: center;
 	font-family: var(--font-interface);
 	font-size: var(--pk-fs);
 	background: var(--pk-surface2);
@@ -1908,8 +1913,15 @@ body.is-mobile .pickme-panel {
 	border-radius: 14px;
 }
 
-/* 抽屉顶部的抓手，明确「这是一层可以收起来的东西」 */
-body.is-mobile .pickme-panel::before {
+/* 抽屉顶部的抓手：真的能抓——按住头部往下甩收起、往上拖展开 */
+body.is-mobile .pickme-panel-head {
+	position: relative;
+	padding-top: 16px;
+	touch-action: none;
+	cursor: grab;
+}
+
+body.is-mobile .pickme-panel-head::before {
 	content: '';
 	position: absolute;
 	top: 6px;
@@ -1918,11 +1930,22 @@ body.is-mobile .pickme-panel::before {
 	height: 4px;
 	margin-left: -18px;
 	border-radius: 999px;
-	background: var(--pk-line-strong, rgba(128, 128, 128, 0.35));
+	background: var(--pk-line);
 }
 
-body.is-mobile .pickme-panel-header {
-	padding-top: 14px;
+body.is-mobile .pickme-panel {
+	transform: translateY(var(--pk-drag, 0px));
+	transition: transform 0.18s ease;
+}
+
+body.is-mobile .pickme-panel.is-dragging,
+body.is-mobile .pickme-panel.is-dragging .pickme-panel-head {
+	transition: none;
+	cursor: grabbing;
+}
+
+body.is-mobile .pickme-panel.is-expanded {
+	max-height: min(88vh, 720px);
 }
 
 /* 触屏上按钮至少 32px 高，行内小按钮也不例外 */
@@ -1965,15 +1988,15 @@ body.is-mobile .pickme-pdf-sticky {
 /* 手机上工具栏只留「目录 / 三种标注 / 高亮开关」：
    翻页靠滚动、缩放靠双指，这些按钮留着会把标注工具挤出屏幕（原来整整占满一行，工具点不到）。 */
 body.is-mobile .pickme-pdf-desk-only,
-body.is-mobile .pickme-pdf-page,
-body.is-mobile .pickme-pdf-total,
 body.is-mobile .pickme-pdf-zoom,
+body.is-mobile .pickme-pdf-total,
 body.is-mobile .pickme-pdf-sep {
 	display: none;
 }
 
 body.is-mobile .pickme-pdf-toolbar {
 	flex-wrap: wrap;
+	column-gap: 4px;
 	row-gap: 4px;
 	padding-bottom: 2px;
 }
@@ -1982,12 +2005,15 @@ body.is-mobile .pickme-pdf-toolbar > * {
 	flex: 0 0 auto;
 }
 
-/* 状态文字让位：挤不下时省略，别把按钮顶到看不见的地方 */
+/* 状态文字单独占一行（手机上信息还是要看得见），别和按钮挤在一行把工具栏顶成三行 */
 body.is-mobile .pickme-pdf-status {
+	order: 100;
+	flex: 1 0 100%;
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	font-size: var(--pk-fs-xs);
 }
 
 /* ===== 位置与尺寸统一走自定义属性 =====

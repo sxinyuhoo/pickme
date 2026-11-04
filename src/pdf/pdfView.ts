@@ -588,7 +588,7 @@ export class PickmePdfView extends FileView {
 		this.addToolbarSep(toolbar);
 
 		// 翻页：两个箭头夹一个页码框，右边跟「/ 共 N 页」
-		this.iconButton(toolbar, 'chevron-left', tKey('上一页'), () => this.scrollToPage(this.pageNumber - 1), 'pickme-pdf-desk-only');
+		this.iconButton(toolbar, 'chevron-left', tKey('上一页'), () => this.scrollToPage(this.pageNumber - 1));
 		this.pageInput = toolbar.createEl('input', { cls: 'pickme-pdf-page', type: 'text' });
 		this.pageInput.value = String(this.pageNumber);
 		this.pageInput.onchange = () => {
@@ -596,7 +596,7 @@ export class PickmePdfView extends FileView {
 			this.scrollToPage(Number.isFinite(parsed) ? parsed : 1);
 		};
 		this.pageTotalEl = toolbar.createSpan({ cls: 'pickme-pdf-total' });
-		this.iconButton(toolbar, 'chevron-right', tKey('下一页'), () => this.scrollToPage(this.pageNumber + 1), 'pickme-pdf-desk-only');
+		this.iconButton(toolbar, 'chevron-right', tKey('下一页'), () => this.scrollToPage(this.pageNumber + 1));
 		this.addToolbarSep(toolbar);
 
 		// 缩放：减 / 百分比（点一下回 100%）/ 加 / 适应宽度，都是图标

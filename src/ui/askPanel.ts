@@ -316,6 +316,7 @@ export class AskPanel implements AskSink {
 		const close = head.createEl('button', { cls: 'pickme-panel-close', text: '×' });
 		close.setAttribute('aria-label', t('关闭'));
 		close.onclick = () => this.close();
+		this.bindSheetDrag(head);
 
 		if (!entry) {
 			root.createDiv({
@@ -574,10 +575,67 @@ export class AskPanel implements AskSink {
 		if (stuck) event.preventDefault();
 	};
 
+	/**
+	 * 按住头部能拖：手机上往下一甩就收起、往上拖就展开。
+	 * 顶部那道小横杠是真的能抓的，不是装饰。
+	 */
+	private bindSheetDrag(head: HTMLElement): void {
+		let start: { y: number; dy: number } | null = null;
+		head.addEventListener('pointerdown', (event) => {
+			if (event.button !== 0) return;
+			if ((event.target as HTMLElement | null)?.closest('button')) return;
+			start = { y: event.clientY, dy: 0 };
+			this.root?.addClass('is-dragging');
+			try {
+				head.setPointerCapture(event.pointerId);
+			} catch {
+				// 捕获失败不影响拖动
+			}
+		});
+		head.addEventListener('pointermove', (event) => {
+			const root = this.root;
+			if (!start || !root) return;
+			start.dy = event.clientY - start.y;
+			// 往下最多跟半屏，往上最多 80px，免得拖出可视区
+			const dy = Math.max(-80, Math.min(start.dy, Math.round(root.offsetHeight * 0.6)));
+			root.setCssProps({ '--pk-drag': `${dy}px` });
+		});
+		const finish = (): void => {
+			const root = this.root;
+			if (!start || !root) {
+				start = null;
+				return;
+			}
+			const dy = start.dy;
+			start = null;
+			root.removeClass('is-dragging');
+			root.setCssProps({ '--pk-drag': '0px' });
+			if (!this.isSheetMode()) return;
+			const height = root.offsetHeight || 1;
+			if (dy > Math.max(64, height * 0.3)) {
+				// 往下甩得够远＝收起（和点 × 一样，没问过的批注会被撤销）
+				this.close();
+				return;
+			}
+			if (dy < -48) {
+				root.addClass('is-expanded');
+				return;
+			}
+			if (dy > 24 && root.hasClass('is-expanded')) root.removeClass('is-expanded');
+		};
+		head.addEventListener('pointerup', finish);
+		head.addEventListener('pointercancel', finish);
+	}
+
 	/** 手机软键盘的高度：可视区比窗口矮多少，抽屉就往上抬多少 */
 	private onKeyboardChange = (): void => {
 		this.applyKeyboardInset();
 	};
+
+	/** 现在是不是「贴底抽屉」形态：跟着布局判断，和 CSS 用同一个条件 */
+	private isSheetMode(): boolean {
+		return document.body.classList.contains('is-mobile');
+	}
 
 	private applyKeyboardInset(): void {
 		const root = this.root;

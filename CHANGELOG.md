@@ -2,6 +2,11 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.6.3
+
+- **手机上面板真能拖了**：顶部那道小横杠现在可抓——按住往下甩就收起（等同点 ×），往上拖展开到更高
+- **手机工具栏补回翻页**：上一版为腾地方把翻页一起收掉了，现在恢复「上一页 / 页码框 / 下一页」，只收起缩放（捏合更快）；顺带修掉页码框被 Obsidian 的 `input[type=text]{width:100%}` 拉满整条工具栏的问题，状态文字单独占一行 → 工具栏从 163px 降到 70px
+
 ## 1.6.2
 
 修「PDF 页面没法缩放，一直是某个固定比例」：
