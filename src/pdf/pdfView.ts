@@ -85,6 +85,8 @@ export class PickmePdfView extends FileView {
 	/** 视口顶部所在的页（1 起） */
 	private pageNumber = 1;
 	private scale = 1.2;
+	/** 双指缩放中的起点（手指间距 + 当时的缩放） */
+	private pinch: { dist: number; scale: number } | null = null;
 	private slots: PageSlot[] = [];
 	/** 每页在滚动内容里的纵向位置与高度，重建/缩放后重算（不在滚动时反复读布局） */
 	private tops: number[] = [];
@@ -641,6 +643,11 @@ export class PickmePdfView extends FileView {
 		this.registerDomEvent(scroll, 'scroll', () => this.onScroll(), { passive: true });
 		// 触控板横向滑动＝整页跳；纵向交给原生滚动（连续滚动本来就是一根滚动条）
 		this.registerDomEvent(scroll, 'wheel', (event) => this.onWheel(event), { passive: false });
+		// 双指缩放：手机上工具栏不放缩放键，捏合是唯一的缩放方式
+		this.registerDomEvent(scroll, 'touchstart', (event) => this.onTouchStart(event), { passive: false });
+		this.registerDomEvent(scroll, 'touchmove', (event) => this.onTouchMove(event), { passive: false });
+		this.registerDomEvent(scroll, 'touchend', () => this.onTouchEnd());
+		this.registerDomEvent(scroll, 'touchcancel', () => this.onTouchEnd());
 		this.stageEl = scroll.createDiv({ cls: 'pickme-pdf-stage' });
 	}
 
@@ -1088,9 +1095,53 @@ export class PickmePdfView extends FileView {
 		this.scrollToPage(this.currentPageFromScroll() + dir);
 	}
 
-	private setScale(scale: number): void {
+	private onTouchStart(event: TouchEvent): void {
+		if (event.touches.length !== 2) return;
+		const [a, b] = [event.touches[0], event.touches[1]];
+		const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+		if (dist <= 0) return;
+		// 捏合就当作要缩放：把正在画的那一笔撤掉，别把手势当成划线
+		if (this.dragStart || this.stickyDrag) this.resetDrag();
+		this.pinch = { dist, scale: this.scale };
+		event.preventDefault();
+	}
+
+	private onTouchMove(event: TouchEvent): void {
+		const pinch = this.pinch;
+		if (!pinch || event.touches.length !== 2) return;
+		event.preventDefault();
+		const [a, b] = [event.touches[0], event.touches[1]];
+		const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+		if (dist <= 0) return;
+		// 只改尺寸不重画：每帧重排一页 PDF 会卡成幻灯片，松手时再补清晰度
+		this.previewScale(pinch.scale * (dist / pinch.dist));
+	}
+
+	private onTouchEnd(): void {
+		if (!this.pinch) return;
+		this.pinch = null;
+		// 松手后按最终缩放重画，文字重新变清晰
+		this.setScale(this.scale, true);
+	}
+
+	/** 缩放期间的轻量版：只改尺寸与滚动位置，不碰画布内容 */
+	private previewScale(scale: number): void {
 		const next = Math.min(Math.max(0.4, Number(scale.toFixed(2))), 4);
 		if (next === this.scale) return;
+		const scroll = this.scrollEl;
+		const anchorPage = this.currentPageFromScroll();
+		const anchorOffset = scroll ? scroll.scrollTop - (this.tops[anchorPage - 1] ?? 0) : 0;
+		const ratio = next / this.scale;
+		this.scale = next;
+		for (const slot of this.slots) this.applySlotSize(slot);
+		this.measureTops();
+		if (scroll) scroll.scrollTop = (this.tops[anchorPage - 1] ?? 0) + anchorOffset * ratio;
+		this.refreshZoomLabel();
+	}
+
+	private setScale(scale: number, force = false): void {
+		const next = Math.min(Math.max(0.4, Number(scale.toFixed(2))), 4);
+		if (next === this.scale && !force) return;
 		const scroll = this.scrollEl;
 		// 缩放前记下锚点（当前页 + 页内偏移），缩放后按比例还原，视线不跑
 		const anchorPage = this.currentPageFromScroll();
@@ -1173,7 +1224,14 @@ export class PickmePdfView extends FileView {
 
 	/** 触控板横向滑动＝整页跳；纵向滚动交给原生（连续滚动下那就是浏览文档本身） */
 	private onWheel(event: WheelEvent): void {
-		if (!this.pdf || this.slots.length <= 1 || this.dragStart) return;
+		if (!this.pdf || this.dragStart) return;
+		// 触控板捏合在浏览器里表现为 ctrl+滚轮：直接当缩放，别拿去翻页
+		if (event.ctrlKey || event.metaKey) {
+			event.preventDefault();
+			this.setScale(this.scale * (event.deltaY < 0 ? 1.1 : 0.9));
+			return;
+		}
+		if (this.slots.length <= 1) return;
 		const decision = decideWheel({
 			deltaX: event.deltaX,
 			deltaY: event.deltaY,

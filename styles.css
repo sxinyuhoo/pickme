@@ -1945,9 +1945,11 @@ body.is-mobile .pickme-index-rowdel {
 	opacity: 1;
 }
 
-/* PDF：浏览态单指滚动、双指缩放；举着工具时把手势交给插件，否则浏览器会把这一笔当成滚动 */
-body.is-mobile .pickme-pdf-browse .pickme-pdf-overlay {
-	touch-action: pan-y pinch-zoom;
+/* PDF：浏览态单指滚动、双指捏合交给插件自己缩放（不能写 pinch-zoom，否则浏览器抢走手势，
+   我们就收不到那两根手指了）；举着工具时把手势整个交给插件，否则这一笔会被当成滚动 */
+body.is-mobile .pickme-pdf-browse .pickme-pdf-overlay,
+body.is-mobile .pickme-pdf-scroll {
+	touch-action: pan-y;
 }
 
 body.is-mobile .pickme-pdf-tool-active .pickme-pdf-overlay {
