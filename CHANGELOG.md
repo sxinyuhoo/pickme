@@ -2,6 +2,11 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.6.5
+
+- **荧光笔划线不再被系统当成「拉出侧边栏」**：翻 Obsidian 自己的手势代码发现，它的滑动识别在 `touchstart` 时沿祖先链检查 `data-ignore-swipe`（值要是真值；`toggleAttribute` 设出来的空字符串会被当成假值，等于没设）——它自家的画布、缩放手柄用的就是这个开关。现在举着标注工具时给视图容器挂上它，工具态下系统完全不再识别滑动；浏览态照旧（想滑动拉出侧栏不受影响）
+- **批注输入框改回左对齐**：上一版给页码框定的样式被误并进了「所有输入框」那条规则（宽 38px、居中），导致面板里“写点什么”的占位文字和光标都居中；已拆成独立规则，页码框单独管
+
 ## 1.6.4
 
 手机端三处：

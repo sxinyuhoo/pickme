@@ -1661,6 +1661,12 @@ export class PickmePdfView extends FileView {
 		// 工具态下让批注对指针透明：否则想在一个框上划荧光笔时，落笔只会打开那条批注
 		this.containerEl.toggleClass('pickme-pdf-tool-active', mode !== 'none');
 		this.containerEl.toggleClass('pickme-pdf-browse', mode === 'none');
+		// 举着工具时，禁止系统把这一划识别成「从边缘拉出侧边栏」：
+		// Obsidian 的手势识别会沿祖先链找 data-ignore-swipe（它自家的画布、缩放手柄也用这招），
+		// 只看行内的 touch-action，写在样式表里的那个它看不见。
+		// 注意值必须是 "true" 这种真值：toggleAttribute 设出来的是空字符串，取值时是假值，等于没设
+		if (mode === 'none') this.containerEl.removeAttribute('data-ignore-swipe');
+		else this.containerEl.setAttribute('data-ignore-swipe', 'true');
 	}
 
 	/** 正在读的那条批注完整显形，同页其它批注退到背景（样式见 styles.css 的 is-active） */
