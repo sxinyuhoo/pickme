@@ -1874,15 +1874,29 @@ body.pickme-mark-border .pickme-mark {
 	display: block;
 }
 
-.pickme-selection-ask {
+/* 量主题底色用的隐形色块（只读它的解析结果，不参与布局） */
+.pickme-swatch {
+	position: fixed;
+	left: -9999px;
+	top: 0;
+	width: 1px;
+	height: 1px;
+	background: var(--pk-probe-bg, var(--background-primary));
+}
+
+body .pickme-selection-bubble .pickme-selection-ask {
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
+	flex-wrap: nowrap;
+	white-space: nowrap;
 	height: 30px;
 	padding: 0 11px;
 	border: 1px solid var(--pk-line);
 	border-radius: var(--pk-pill);
-	background: var(--pk-surface);
+	/* 底色用去掉了透明度的主题色（见 selectionBubble.applyOpaqueBackdrop）：
+	   开了半透明界面时，主题色带 alpha，浮框会透出下面的正文，两段字叠在一起 */
+	background: var(--pk-bubble-bg, var(--pk-surface));
 	color: var(--pk-ink);
 	font-size: var(--pk-fs-ctl);
 	font-weight: 500;
@@ -1891,13 +1905,14 @@ body.pickme-mark-border .pickme-mark {
 	transition: var(--pk-t);
 }
 
-.pickme-selection-ask:hover {
+body .pickme-selection-bubble .pickme-selection-ask:hover {
 	border-color: var(--pk-acc-line);
 	color: var(--pk-acc-ink);
-	background: var(--pk-acc-soft);
+	/* 强调色的淡染层压在不透明底色上，既能看出悬停、又不会漏出正文 */
+	background-image: linear-gradient(var(--pk-acc-soft), var(--pk-acc-soft));
 }
 
-.pickme-selection-icon {
+body .pickme-selection-bubble .pickme-selection-icon {
 	display: inline-flex;
 }
 

@@ -2,6 +2,10 @@
 
 Release notes shown on GitHub are taken from the section of this file that matches the tag.
 
+## 1.6.6
+
+- **修「浮出的提问按钮透出正文、两段字叠在一起」**：启用「半透明界面」（translucency，Baseline 等主题常见）时主题的背景色带透明度，浮框于是能看穿到下面的正文。现在浮框会量一次主题底色、把 alpha 抹掉做不透明底（优先 `--background-primary`，取不到再退次级背景）；换主题/切深浅时自动重算。顺带把浮框按钮的选择器权重提上去（主题对 `button` 的样式原本会盖掉我们的底色），并禁止标签换行
+
 ## 1.6.5
 
 - **荧光笔划线不再被系统当成「拉出侧边栏」**：翻 Obsidian 自己的手势代码发现，它的滑动识别在 `touchstart` 时沿祖先链检查 `data-ignore-swipe`（值要是真值；`toggleAttribute` 设出来的空字符串会被当成假值，等于没设）——它自家的画布、缩放手柄用的就是这个开关。现在举着标注工具时给视图容器挂上它，工具态下系统完全不再识别滑动；浏览态照旧（想滑动拉出侧栏不受影响）

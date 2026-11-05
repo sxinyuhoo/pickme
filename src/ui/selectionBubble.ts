@@ -10,6 +10,19 @@ import { cmView } from '../render/anchorRenderer.ts';
  * 于是手机有入口、桌面也省得记菜单在哪。
  * 位置跟着选区走，选区没了/滚走了/点到别处就收起来。
  */
+/** 把 rgb()/rgba() 的透明度抹掉；全透明或认不出来时返回 null（让调用方换下一个候选） */
+function toOpaqueColor(color: string): string | null {
+	if (!color.startsWith('rgb')) return null;
+	const open = color.indexOf('(');
+	const close = color.lastIndexOf(')');
+	if (open < 0 || close <= open) return null;
+	const parts = color.slice(open + 1, close).split(',').map((part) => part.trim()).filter((part) => part !== '');
+	if (parts.length < 3) return null;
+	const alpha = parts.length >= 4 ? Number(parts[3]) : 1;
+	if (!Number.isFinite(alpha) || alpha <= 0) return null;
+	return `rgb(${parts[0]}, ${parts[1]}, ${parts[2]})`;
+}
+
 export class SelectionBubble {
 	private plugin: PickmePlugin;
 	private host: HTMLElement;
@@ -44,6 +57,33 @@ export class SelectionBubble {
 		plugin.registerEvent(
 			plugin.app.workspace.on('active-leaf-change', () => this.hide()),
 		);
+		plugin.registerEvent(plugin.app.workspace.on('css-change', () => this.applyOpaqueBackdrop()));
+	}
+
+	/** 第一次浮出时再量一次：插件加载那一刻主题样式可能还没落地，量出来会是全透明 */
+	private ensureOpaqueBackdrop(): void {
+		if (this.host.style.getPropertyValue('--pk-bubble-bg')) return;
+		this.applyOpaqueBackdrop();
+	}
+
+	/**
+	 * 开关「半透明界面」（translucency）时，主题的 --background-primary 是带透明度的，
+	 * 浮框会透出下面的正文（两段字叠在一起）。这里量一个真实元素拿到解析后的颜色，
+	 * 把 alpha 抹成 1，浮框就有了同色但不透明的底。
+	 */
+	private applyOpaqueBackdrop(): void {
+		for (const name of ['--background-primary', '--background-secondary', '--background-primary-alt', '--color-base-00']) {
+			const probe = document.body.createDiv({ cls: 'pickme-swatch' });
+			probe.setCssProps({ '--pk-probe-bg': `var(${name})` });
+			const resolved = getComputedStyle(probe).backgroundColor;
+			probe.remove();
+			const solid = toOpaqueColor(resolved);
+			if (solid) {
+				this.host.setCssProps({ '--pk-bubble-bg': solid });
+				return;
+			}
+		}
+		// 一个都没量出来（主题还没加载好之类）：保留现状，交给 CSS 的兜底值，别把已有的值清掉
 	}
 
 	destroy(): void {
@@ -97,6 +137,7 @@ export class SelectionBubble {
 
 	/** 编辑器选区 → 屏幕坐标（CM6 的 coordsAtPos 给的是一行内的高亮矩形） */
 	private showForEditor(view: MarkdownView): void {
+		this.ensureOpaqueBackdrop();
 		const editor = view.editor;
 		const from = editor.posToOffset(editor.getCursor('from'));
 		const to = editor.posToOffset(editor.getCursor('to'));
@@ -120,6 +161,7 @@ export class SelectionBubble {
 	}
 
 	private show(range: Range): void {
+		this.ensureOpaqueBackdrop();
 		const rect = range.getBoundingClientRect();
 		this.place({ left: rect.left, top: rect.top, width: rect.width, height: rect.height, bottom: rect.bottom });
 	}
