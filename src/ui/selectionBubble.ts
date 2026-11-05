@@ -29,6 +29,8 @@ export class SelectionBubble {
 	private button: HTMLElement;
 	private view: MarkdownView | null = null;
 	private timer: number | null = null;
+	/** 点过的那段文字：同一段选区不再冒头，直到选区变了或清掉 */
+	private suppressText: string | null = null;
 
 	constructor(plugin: PickmePlugin) {
 		this.plugin = plugin;
@@ -106,8 +108,23 @@ export class SelectionBubble {
 			this.hide();
 			return;
 		}
+		// 批注面板开着的时候它就是主界面，浮出的按钮只会碍事、还会被夹到屏幕边上
+		if (document.querySelector('.pickme-panel')) {
+			this.hide();
+			return;
+		}
 		const selection = window.getSelection();
 		const domText = selection && !selection.isCollapsed && selection.rangeCount > 0 ? selection.toString().trim() : '';
+		// 刚点过的那一段（面板已经从它开出来了）：只要选区还是它，就别再冒头；
+		// 换成别的选区或把选区清掉，就恢复正常
+		const current = domText || this.editorSelectionText(view);
+		if (this.suppressText !== null) {
+			if (!current || current === this.suppressText) {
+				this.hide();
+				return;
+			}
+			this.suppressText = null;
+		}
 		if (!domText) {
 			// 编辑态里 DOM 选区有时是空的（编辑器没拿到焦点），退回编辑器自己的选区
 			this.showForEditor(view);
@@ -133,6 +150,11 @@ export class SelectionBubble {
 		}
 		this.view = view;
 		this.show(range);
+	}
+
+	/** 编辑器自己的选区文字（DOM 选区为空时用它来判断「还是不是刚才那段」） */
+	private editorSelectionText(view: MarkdownView): string {
+		return view.editor.getSelection().trim();
 	}
 
 	/** 编辑器选区 → 屏幕坐标（CM6 的 coordsAtPos 给的是一行内的高亮矩形） */
@@ -192,6 +214,9 @@ export class SelectionBubble {
 		const view = this.view;
 		this.hide();
 		if (!view) return;
+		// 记下这一段：接着弹出的面板就是它的，浮出按钮不该再出现
+		const selection = window.getSelection();
+		this.suppressText = (selection ? selection.toString().trim() : '') || this.editorSelectionText(view) || null;
 		void this.plugin.askSelection(view);
 	}
 }
