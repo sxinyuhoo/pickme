@@ -392,7 +392,11 @@ export class AskPanel implements AskSink {
 		};
 
 		const row = box.createDiv({ cls: 'pickme-row' });
+		// 同一排里「保存批注」和「编辑」是同一个位置：编辑态给保存，展示态给编辑
 		const save = row.createEl('button', { cls: 'mod-cta', text: t('保存批注') });
+		const edit = row.createEl('button', { cls: 'pickme-note-edit', text: t('编辑') });
+		edit.setAttribute('aria-label', t('就在这个框里改这条批注'));
+		edit.onclick = () => setEditing(true);
 		const ask = row.createEl('button', { text: t('改问 AI') });
 		ask.setAttribute('aria-label', t('把这条高亮交给 AI 提问'));
 		const sticky = isStickyEntry(entry);
@@ -401,9 +405,7 @@ export class AskPanel implements AskSink {
 		const remove = row.createEl('button', { cls: 'pickme-note-remove', text: t('删除') });
 		remove.setAttribute('aria-label', sticky ? t('连同便利贴一起删掉') : isText ? t('连同锚点一起删掉') : t('连同这条高亮一起删掉'));
 
-		const edit = row.createEl('button', { cls: 'pickme-note-edit', text: t('编辑') });
-		edit.setAttribute('aria-label', t('就在这个框里改这条批注'));
-		edit.onclick = () => setEditing(true);
+
 
 		const saveNote = async () => {
 			const text = input.value.trim();
@@ -562,7 +564,7 @@ export class AskPanel implements AskSink {
 		// 刚框出来、还没问过的批注不摆删除：这时候关掉面板就是撤销，用不着删
 		const canDelete = (this.entry?.qas.length ?? 0) > 0 || !this.fresh;
 		if (canDelete) {
-			const remove = actions.createEl('button', { text: t('删除') });
+			const remove = actions.createEl('button', { cls: 'pickme-note-remove', text: t('删除') });
 			remove.addClass('mod-warning');
 			remove.onclick = () => {
 				const detail = this.entry?.kind === 'pdf'
