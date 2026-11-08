@@ -1,4 +1,5 @@
 import { MarkdownView, Notice, Plugin, TFile } from 'obsidian';
+import type { WorkspaceLeaf } from 'obsidian';
 import { setLanguage, t } from './i18n.ts';
 import { DEFAULT_SETTINGS, PickmeSettingTab } from './settings.ts';
 import type { PickmeSettings } from './settings.ts';
@@ -597,6 +598,10 @@ export default class PickmePlugin extends Plugin {
 	 */
 	async activateEntry(id: string, anchorEl?: Element | null): Promise<void> {
 		const file = this.activeFile();
+		// 人在正文里点这条批注（anchorEl 有值）：把面板开出来就够了。
+		// 不能再走 jumpToAnchor——它会 openFile 重开一次文档，阅读视图整篇重绘，看起来就是「闪一下」；
+		// 也没必要再闪一次高亮：手指本来就点在它上面。
+		if (anchorEl && this.settings.inlineAsk && this.openEntryPanel(id, file, null, anchorEl)) return;
 		if (this.settings.inlineAsk && this.openEntryPanel(id, file, null, anchorEl)) {
 			await this.jumpToAnchor(id, file);
 			return;
@@ -665,6 +670,8 @@ export default class PickmePlugin extends Plugin {
 			await this.app.vault.process(file, (data) =>
 				data.slice(0, offsets.from) + tag + data.slice(offsets.from, offsets.to) + tag + data.slice(offsets.to),
 			);
+			// 阅读视图不会因为我们自己写的锚点而重画：不主动刷一次，新批注的高亮要等下次打开文档才看得见
+			this.rerenderReadingView(view);
 		}
 
 		const entry: AnnotationEntry = {
@@ -714,6 +721,12 @@ export default class PickmePlugin extends Plugin {
 			return null;
 		}
 		return { from: first, to: first + selected.length, text, via: 'vault' };
+	}
+
+	/** 阅读视图重画一次（previewMode 不在公开类型里，按运行时形状取用） */
+	private rerenderReadingView(view: MarkdownView): void {
+		const preview = (view as MarkdownView & { previewMode?: { rerender?: (full?: boolean) => void } }).previewMode;
+		preview?.rerender?.(true);
 	}
 
 	private uniqueAnchorId(text: string): string {
@@ -1042,8 +1055,12 @@ export default class PickmePlugin extends Plugin {
 			new Notice(t('pickme：原文里找不到锚点 {v0}', { v0: id }));
 			return;
 		}
-		const leaf = this.app.workspace.getLeaf(false);
-		await leaf.openFile(target);
+		// 文档已经开着就直接用它：再 openFile 一次会让阅读视图整篇重绘，看着就是闪一下
+		let leaf = this.leafShowing(target);
+		if (!leaf) {
+			leaf = this.app.workspace.getLeaf(false);
+			await leaf.openFile(target);
+		}
 		const view = leaf.view instanceof MarkdownView ? leaf.view : null;
 		if (!view) return;
 		const editor = view.editor;
@@ -1052,6 +1069,15 @@ export default class PickmePlugin extends Plugin {
 		editor.setSelection(from, to);
 		editor.scrollIntoView({ from, to }, true);
 		this.flashEntry(id, target);
+	}
+
+	/** 已经在显示这个文件的 markdown 叶子（没有就返回 null） */
+	private leafShowing(file: TFile): WorkspaceLeaf | null {
+		for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
+			const view = leaf.view;
+			if (view instanceof MarkdownView && view.file?.path === file.path) return leaf;
+		}
+		return null;
 	}
 
 	/** 侧边栏或正文里点击批注：跳转并高亮 */

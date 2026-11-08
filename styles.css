@@ -1860,6 +1860,51 @@ body.pickme-mark-border .pickme-mark {
 }
 
 
+/* ===== 面板里的「批注 ｜ 问 AI」切换 ===== */
+.pickme-switch {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	margin: 0 0 8px;
+	padding: 2px;
+	border: 1px solid var(--pk-line);
+	border-radius: var(--pk-pill);
+	background: var(--pk-surface2);
+}
+
+.pickme-switch-item {
+	height: 22px;
+	padding: 0 12px;
+	border: none;
+	border-radius: var(--pk-pill);
+	background: transparent;
+	box-shadow: none;
+	color: var(--pk-ink4);
+	font-size: var(--pk-fs-ctl);
+	cursor: pointer;
+	transition: var(--pk-t);
+}
+
+.pickme-switch-item:hover {
+	color: var(--pk-ink);
+	background: var(--pk-surface3);
+}
+
+.pickme-switch-item.is-active {
+	background: var(--pk-acc);
+	color: #fff;
+}
+
+/* 两栏互斥：切的时候只换类名，不重建 DOM（重建会闪一下） */
+.pickme-pane {
+	display: none;
+}
+
+.pickme-panel.is-pane-note .pickme-pane-note,
+.pickme-panel.is-pane-ask .pickme-pane-ask {
+	display: block;
+}
+
 /* ===== 选中正文后的悬浮入口 =====
    跟着选区走的小胶囊：手机没有右键菜单，桌面也少记一个入口。 */
 .pickme-selection-bubble {

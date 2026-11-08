@@ -65,6 +65,9 @@ function isStickyEntry(entry: AnnotationEntry | null): boolean {
 
 const PANEL_WIDTH = 380;
 
+/** 上一次用的是哪一栏（批注 / 问 AI）：同一会话里沿用，省得每次都要切一下 */
+let lastPane: 'note' | 'ask' | null = null;
+
 /** 关面板的原因：用户主动取消，还是被新面板顶掉 */
 export type PanelCloseReason = 'user' | 'handover';
 
@@ -125,6 +128,8 @@ export class AskPanel implements AskSink {
 	private fresh = false;
 	/** 当前形态：用户点过「改问 AI」就固定成 'ask' */
 	private mode: 'ask' | 'note' | null = null;
+	private noteTab: HTMLElement | null = null;
+	private askTab: HTMLElement | null = null;
 	private noteInput: HTMLTextAreaElement | null = null;
 	/** 面板当前贴在锚点的哪一侧；定下来就不再随锚点微动而翻边 */
 	private side: 'right' | 'left' | null = null;
@@ -331,14 +336,17 @@ export class AskPanel implements AskSink {
 			root.createDiv({ cls: 'pickme-selection', text: shorten(selection, 160) });
 		}
 
-		if (this.mode === 'note' || (this.mode === null && isNoteBoxEntry(entry))) {
-			this.renderNoteBox(root, entry);
-			// 以前问过 AI 的高亮仍然把问答显示出来，别把已有内容藏起来
-			if (entry.qas.length) this.renderHistory(root, entry);
-		} else {
-			this.renderComposer(root, entry);
-			this.renderHistory(root, entry);
-		}
+		// 批注与「问 AI」都摆进同一个弹框：上面一排切换，下面两块，切换时只换类名不重建 DOM
+		const pane = this.resolvePane(entry);
+		this.renderPaneSwitch(root);
+		const notePane = root.createDiv({ cls: 'pickme-pane pickme-pane-note' });
+		this.renderNoteBox(notePane, entry);
+		const askPane = root.createDiv({ cls: 'pickme-pane pickme-pane-ask' });
+		this.renderComposer(askPane, entry);
+		// 状态行两栏共用一条：各自建一条的话，setStatus 只会写到最后建的那条上
+		this.statusEl = root.createDiv({ cls: 'pickme-status' });
+		if (entry.qas.length) this.renderHistory(root, entry);
+		this.setPane(pane);
 		// 内容变了尺寸也变，重排后按锚点再校一次位置
 		this.applyPosition();
 	}
@@ -355,20 +363,17 @@ export class AskPanel implements AskSink {
 		input.placeholder = isStickyEntry(entry) ? t('写点什么…（⌘/Ctrl + Enter 保存）') : t('写点批注…（⌘/Ctrl + Enter 保存）');
 		input.value = entry.note ?? '';
 
-		// 状态行要自己建：setStatus 写的是 this.statusEl，而问答表单里那个在批注形态下不存在
-		const status = box.createDiv({ cls: 'pickme-status' });
-		this.statusEl = status;
-
 		const row = box.createDiv({ cls: 'pickme-row' });
 		const save = row.createEl('button', { cls: 'mod-cta', text: t('保存批注') });
 		const ask = row.createEl('button', { text: t('改问 AI') });
 		ask.setAttribute('aria-label', t('把这条高亮交给 AI 提问'));
 		const sticky = isStickyEntry(entry);
+		const isText = entry.kind === 'text';
 		const remove = row.createEl('button', {
 			cls: 'pickme-note-remove',
-			text: sticky ? t('删除这张便利贴') : t('删除这条高亮'),
+			text: sticky ? t('删除这张便利贴') : isText ? t('删除这条批注') : t('删除这条高亮'),
 		});
-		remove.setAttribute('aria-label', sticky ? t('连同便利贴一起删掉') : t('连同这条高亮一起删掉'));
+		remove.setAttribute('aria-label', sticky ? t('连同便利贴一起删掉') : isText ? t('连同锚点一起删掉') : t('连同这条高亮一起删掉'));
 
 		const saveNote = async () => {
 			const text = input.value.trim();
@@ -398,15 +403,46 @@ export class AskPanel implements AskSink {
 			}
 		});
 		save.onclick = () => void saveNote();
-		ask.onclick = () => {
-			this.mode = 'ask';
-			this.render();
-		};
+		ask.onclick = () => this.setPane('ask');
 		remove.onclick = () => {
-			new ConfirmModal(this.plugin.app, sticky ? t('删掉这张便利贴？') : t('连同高亮删掉这条批注？'), () => {
-				void this.plugin.deleteEntry(this.entryId, this.file).then(() => this.close('handover'));
-			}).open();
+			new ConfirmModal(
+				this.plugin.app,
+				sticky ? t('删掉这张便利贴？') : isText ? t('连同正文里的锚点一起删掉这条批注？') : t('连同高亮删掉这条批注？'),
+				() => {
+					void this.plugin.deleteEntry(this.entryId, this.file).then(() => this.close('handover'));
+				},
+			).open();
 		};
+	}
+
+	/** 先摆哪一栏：批注，还是问 AI */
+	private resolvePane(entry: AnnotationEntry | null): 'note' | 'ask' {
+		if (this.mode === 'note') return 'note';
+		if (this.mode === 'ask') return 'ask';
+		// 文字批注（Markdown 选区）两种都支持：第一次进来先给「批注」，之后沿用上次选的那一栏
+		if (entry?.kind === 'text') return lastPane ?? 'note';
+		return isNoteBoxEntry(entry) ? 'note' : 'ask';
+	}
+
+	/** 顶部那排切换：批注 ｜ 问 AI */
+	private renderPaneSwitch(root: HTMLElement): void {
+		const bar = root.createDiv({ cls: 'pickme-switch' });
+		this.noteTab = bar.createEl('button', { cls: 'pickme-switch-item', text: t('批注') });
+		this.askTab = bar.createEl('button', { cls: 'pickme-switch-item', text: t('问 AI') });
+		this.noteTab.onclick = () => this.setPane('note');
+		this.askTab.onclick = () => this.setPane('ask');
+	}
+
+	private setPane(pane: 'note' | 'ask'): void {
+		lastPane = pane;
+		const root = this.root;
+		if (!root) return;
+		root.toggleClass('is-pane-note', pane === 'note');
+		root.toggleClass('is-pane-ask', pane === 'ask');
+		this.noteTab?.toggleClass('is-active', pane === 'note');
+		this.askTab?.toggleClass('is-active', pane === 'ask');
+		this.noteTab?.setAttribute('aria-pressed', String(pane === 'note'));
+		this.askTab?.setAttribute('aria-pressed', String(pane === 'ask'));
 	}
 
 	private renderComposer(root: HTMLElement, entry: AnnotationEntry): void {
