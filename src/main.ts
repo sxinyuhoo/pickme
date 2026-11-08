@@ -96,6 +96,7 @@ export default class PickmePlugin extends Plugin {
 		}
 		// 设置里写了索引笔记的路径，文件却不在——用户会以为坏了，启动时补一份
 		await this.ensureIndexFile();
+		void this.autoMigrateOnUpdate();
 
 		this.registerEvent(
 			this.app.workspace.on('active-leaf-change', () => {
@@ -399,6 +400,32 @@ export default class PickmePlugin extends Plugin {
 		if (opened) await this.app.workspace.revealLeaf(opened);
 		else await this.app.workspace.getLeaf(false).openFile(file);
 		await this.jumpToAnchor(id, file);
+	}
+
+	/**
+	 * 插件更新后自动迁移老格式锚点。
+	 *
+	 * Obsidian 没有「插件更新完成」这类事件，所以用版本号自己判断：
+	 * 把上次加载时的版本记在设置里，启动时对不上就是刚更新过。
+	 * 只在确实扫到老格式锚点时才动手，而且迁移本身带备份与复核（见 migrateAnchorFormat）。
+	 */
+	private async autoMigrateOnUpdate(): Promise<void> {
+		const version = this.manifest.version;
+		const previous = this.settings.lastVersion;
+		this.settings.lastVersion = version;
+		await this.saveSettings();
+		// 首次安装（没记过版本）或版本没变：不动用户文件
+		if (!previous || previous === version) return;
+		if (!this.settings.autoMigrateAnchors) return;
+		// 等布局就绪、索引稳定之后再扫，避免把「还没加载完」当成「没有锚点」
+		this.app.workspace.onLayoutReady(() => {
+			void (async () => {
+				const { total } = await this.scanLegacyAnchors();
+				if (total === 0) return;
+				new Notice(t('pickme：检测到 {v0} 个老格式锚点，正在自动迁移（先备份）…', { v0: total }), 6000);
+				await this.migrateAnchorFormat();
+			})();
+		});
 	}
 
 	/**

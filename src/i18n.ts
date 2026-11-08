@@ -37,6 +37,14 @@ export const EN: Record<string, string> = {
 	'pickme：当前文档还没有批注': 'Pick Me: this document has no annotations yet',
 	'批注': 'Note',
 	'迁移锚点格式（旧 → 新）': 'Migrate anchors to the new format',
+	'更新后自动迁移老格式锚点': 'Auto-migrate old-format anchors after an update',
+	'老格式（自定义标签写法）的锚点在阅读视图里画不出来。插件更新后如果检测到它们，会自动迁到新格式——迁移前先把涉及的文档备份到插件目录，迁完再复核一遍。关掉就只在命令面板里手动跑。':
+		'Anchors in the old custom-tag form cannot be drawn in reading view. After an update the plugin migrates them automatically when it finds any — every touched note is backed up into the plugin folder first and verified afterwards. Turn this off to migrate by hand only.',
+	'立即迁移老格式锚点': 'Migrate old-format anchors now',
+	'先扫全库报个数（不改文件），确认后再迁移；迁移前会自动备份。':
+		'Scans the vault and reports the count first (nothing is written), then migrates after you confirm; a backup is taken beforehand.',
+	'扫描并迁移': 'Scan and migrate',
+	'pickme：检测到 {v0} 个老格式锚点，正在自动迁移（先备份）…': 'Pick Me: found {v0} old-format anchors — migrating automatically (backing up first)…',
 	'pickme：没有需要迁移的锚点': 'Pick Me: no anchors to migrate',
 	'把 {v0} 个文档里的 {v1} 个旧格式锚点迁成新格式（只动标记写法，不动选区内文字）。迁移前会把这些文档备份到插件目录。':
 		'Migrate {v1} old-format anchors in {v0} documents to the new format (only the markers change, not the text). These documents are backed up into the plugin folder first.',

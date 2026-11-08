@@ -81,8 +81,12 @@ export interface PickmeSettings {
 	markStyle: MarkStyle;
 	/** 是否为没有批注的文档创建批注文件 */
 	createEmptyAnnotationFile: boolean;
-	/** 上一次的锚点标签名，用于批量替换 */
+	/** 上次的锚点标签名，用于批量替换 */
 	previousTagName: string;
+	/** 上次加载时的插件版本：和当前不一致＝刚更新过，用来触发老锚点的自动迁移 */
+	lastVersion: string;
+	/** 更新后检测到老格式锚点时自动迁移（会先备份） */
+	autoMigrateAnchors: boolean;
 	/** 手机上那条「怎么点开批注」的提示只弹一次 */
 	mobileHintShown: boolean;
 }
@@ -134,6 +138,8 @@ export const DEFAULT_SETTINGS: PickmeSettings = {
 	createEmptyAnnotationFile: false,
 	previousTagName: '',
 	mobileHintShown: false,
+	lastVersion: '',
+	autoMigrateAnchors: true,
 };
 
 /** 设置项的存储键：就是 PickmeSettings 的字段名，交给 SettingDefinitionItem<K> 做编译期检查 */
@@ -638,6 +644,46 @@ export class PickmeSettingTab extends PluginSettingTab {
 							type: 'text',
 							key: 'tagName',
 							defaultValue: DEFAULT_SETTINGS.tagName,
+						},
+					},
+					{
+						name: t('更新后自动迁移老格式锚点'),
+						desc: t(
+							'老格式（自定义标签写法）的锚点在阅读视图里画不出来。插件更新后如果检测到它们，会自动迁到新格式——迁移前先把涉及的文档备份到插件目录，迁完再复核一遍。关掉就只在命令面板里手动跑。',
+						),
+						aliases: ['migrate', 'anchor', 'version'],
+						control: {
+							type: 'toggle',
+							key: 'autoMigrateAnchors',
+							defaultValue: DEFAULT_SETTINGS.autoMigrateAnchors,
+						},
+					},
+					{
+						name: t('立即迁移老格式锚点'),
+						desc: t('先扫全库报个数（不改文件），确认后再迁移；迁移前会自动备份。'),
+						aliases: ['migrate', 'anchor'],
+						render: (setting) => {
+							setting.addButton((button) => {
+								button.setButtonText(t('扫描并迁移')).onClick(() => {
+									void (async () => {
+										const { files, total } = await this.plugin.scanLegacyAnchors();
+										if (total === 0) {
+											new Notice(t('pickme：没有需要迁移的锚点'));
+											return;
+										}
+										new ConfirmModal(
+											this.plugin.app,
+											t(
+												'把 {v0} 个文档里的 {v1} 个旧格式锚点迁成新格式（只动标记写法，不动选区内文字）。迁移前会把这些文档备份到插件目录。',
+												{ v0: files.length, v1: total },
+											),
+											() => {
+												void this.plugin.migrateAnchorFormat();
+											},
+										).open();
+									})();
+								});
+							});
 						},
 					},
 					{
