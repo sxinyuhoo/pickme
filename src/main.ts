@@ -21,6 +21,8 @@ import {
 	insertAnchors,
 	newAnchorId,
 	removeAnchors,
+	countLegacyAnchors,
+	migrateAnchors,
 	scanAnchors,
 	stripAnchors,
 } from './core/anchor.ts';
@@ -397,6 +399,78 @@ export default class PickmePlugin extends Plugin {
 		if (opened) await this.app.workspace.revealLeaf(opened);
 		else await this.app.workspace.getLeaf(false).openFile(file);
 		await this.jumpToAnchor(id, file);
+	}
+
+	/**
+	 * 老格式（<pickme id="x"></pickme>）还剩多少：命令先拿它报数，这一步不写盘。
+	 * 只扫 .md：PDF 那边的锚点信息在批注文件里，不受标记格式影响。
+	 */
+	async scanLegacyAnchors(): Promise<{ files: TFile[]; total: number }> {
+		const tag = this.settings.tagName;
+		const files: TFile[] = [];
+		let total = 0;
+		for (const file of this.app.vault.getMarkdownFiles()) {
+			let text = '';
+			try {
+				text = await this.app.vault.cachedRead(file);
+			} catch {
+				continue;
+			}
+			const count = countLegacyAnchors(text, tag);
+			if (count > 0) {
+				files.push(file);
+				total += count;
+			}
+		}
+		return { files, total };
+	}
+
+	/**
+	 * 一次性把老格式锚点迁到新格式（<span data-xxx>）。
+	 * 三条纪律：先备份、再改、改完按计数核对（新格式数量必须等于旧格式数量）。
+	 * 解析器只认新格式，所以这一步不做「双写法兼容」。
+	 */
+	async migrateAnchorFormat(): Promise<void> {
+		const tag = this.settings.tagName;
+		const { files, total } = await this.scanLegacyAnchors();
+		if (total === 0) {
+			new Notice(t('pickme：没有需要迁移的锚点'));
+			return;
+		}
+		// ① 备份：原样存到插件目录下，路径按库内相对路径摆放
+		const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+		const backupDir = `${this.manifest.dir}/backup-${stamp}`;
+		try {
+			await this.app.vault.adapter.mkdir(backupDir);
+		} catch {
+			// 已存在就接着用
+		}
+		for (const file of files) {
+			const original = await this.app.vault.read(file);
+			const target = `${backupDir}/${file.path}`;
+			const slash = target.lastIndexOf('/');
+			if (slash > 0) await this.app.vault.adapter.mkdir(target.slice(0, slash));
+			await this.app.vault.adapter.write(target, original);
+		}
+
+		// ② 改：只换标记写法，不动选区内文字
+		let changed = 0;
+		for (const file of files) {
+			await this.app.vault.process(file, (data) => {
+				const { text, ids } = migrateAnchors(data, tag);
+				changed += ids.length;
+				return text;
+			});
+		}
+
+		// ③ 核对：旧格式应该归零，新格式数量对得上
+		const after = await this.scanLegacyAnchors();
+		if (after.total !== 0) {
+			new Notice(t('pickme：还有 {v0} 个旧格式锚点没迁完，请再跑一次命令', { v0: after.total }));
+			return;
+		}
+		new Notice(t('pickme：已迁移 {v0} 个锚点（{v1} 个文档），原文件备份在 {v2}', { v0: changed, v1: files.length, v2: backupDir }), 8000);
+		await this.refreshViews();
 	}
 
 	async refreshViews(): Promise<void> {

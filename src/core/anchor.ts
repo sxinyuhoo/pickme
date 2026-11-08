@@ -19,21 +19,50 @@ export function escapeRegExp(input: string): string {
 	return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** 生成成对的空标签，起点与终点使用同一个 id */
+/**
+ * 生成成对的空标记，起点与终点使用同一个 id。
+ *
+ * 用 span + data-* 而不是自定义标签：Obsidian 的渲染器只保留它认识的标签，
+ * 自定义标签（如 <pickme>）在阅读视图里会被丢掉，标记就跟着没了。
+ */
 export function anchorTag(id: string, tag: string = DEFAULT_TAG): string {
-	return `<${tag} id="${id}"></${tag}>`;
+	return `<span data-${tag}="${id}"></span>`;
 }
 
-/** 匹配合法锚点标签的正则 */
+/** 匹配合法锚点标记的正则 */
 export function anchorRegExp(tag: string = DEFAULT_TAG): RegExp {
+	const t = escapeRegExp(tag);
+	return new RegExp(`<span\\s+data-${t}="([a-z0-9]{${ID_LENGTH}})"\\s*></span>`, 'g');
+}
+
+/** 匹配任何形态的锚点标记（含不合法写法），用于统计损坏标记 */
+export function looseAnchorRegExp(tag: string = DEFAULT_TAG): RegExp {
+	const t = escapeRegExp(tag);
+	return new RegExp(`<span\\b[^>]*data-${t}\\b[^>]*></span>`, 'gi');
+}
+
+/** 老格式（<pickme id="x"></pickme>）——只用于一次性迁移，解析器不再认它 */
+export function legacyAnchorRegExp(tag: string = DEFAULT_TAG): RegExp {
 	const t = escapeRegExp(tag);
 	return new RegExp(`<${t}\\s+id="([a-z0-9]{${ID_LENGTH}})"\\s*></${t}>`, 'g');
 }
 
-/** 匹配任何形态的锚点标签（含不合法写法），用于统计损坏标签 */
-export function looseAnchorRegExp(tag: string = DEFAULT_TAG): RegExp {
-	const t = escapeRegExp(tag);
-	return new RegExp(`<${t}\\b[^>]*></${t}>`, 'gi');
+/** 老格式还剩多少（迁移命令先拿它报数） */
+export function countLegacyAnchors(text: string, tag: string = DEFAULT_TAG): number {
+	return [...text.matchAll(legacyAnchorRegExp(tag))].length;
+}
+
+/**
+ * 老格式 → 新格式。不动文字，只换标记写法；返回改了哪几个 id。
+ * 解析器只认新格式，所以这是必须走一趟的一次性迁移（迁移前会先备份）。
+ */
+export function migrateAnchors(text: string, tag: string = DEFAULT_TAG): { text: string; ids: string[] } {
+	const ids: string[] = [];
+	const out = text.replace(legacyAnchorRegExp(tag), (_all, id: string) => {
+		ids.push(id);
+		return anchorTag(id, tag);
+	});
+	return { text: out, ids };
 }
 
 /**
@@ -57,16 +86,13 @@ export function insertAnchors(
 	return text.slice(0, from) + pair + text.slice(from, to) + pair + text.slice(to);
 }
 
-/** 移除指定 id 的两个标签 */
+/** 移除指定 id 的两个标记 */
 export function removeAnchors(text: string, id: string, tag: string = DEFAULT_TAG): string {
-	const re = new RegExp(
-		`<${escapeRegExp(tag)}\\s+id="${id}"\\s*></${escapeRegExp(tag)}>`,
-		'g',
-	);
+	const re = new RegExp(`<span\\s+data-${escapeRegExp(tag)}="${id}"\\s*></span>`, 'g');
 	return text.replace(re, '');
 }
 
-/** 把文本里所有锚点标签去掉，用于导出或纯文本比对 */
+/** 把文本里所有锚点标记去掉，用于导出或纯文本比对 */
 export function stripAnchors(text: string, tag: string = DEFAULT_TAG): string {
 	return text.replace(looseAnchorRegExp(tag), '');
 }

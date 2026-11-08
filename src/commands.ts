@@ -180,6 +180,30 @@ export function registerCommands(plugin: PickmePlugin): void {
 	});
 
 	plugin.addCommand({
+		id: 'migrate-anchor-format',
+		name: t('迁移锚点格式（旧 → 新）'),
+		callback: () => {
+			void (async () => {
+				const { files, total } = await plugin.scanLegacyAnchors();
+				if (total === 0) {
+					new Notice(t('pickme：没有需要迁移的锚点'));
+					return;
+				}
+				new ConfirmModal(
+					plugin.app,
+					t(
+						'把 {v0} 个文档里的 {v1} 个旧格式锚点迁成新格式（只动标记写法，不动选区内文字）。迁移前会把这些文档备份到插件目录。',
+						{ v0: files.length, v1: total },
+					),
+					() => {
+						void plugin.migrateAnchorFormat();
+					},
+				).open();
+			})();
+		},
+	});
+
+	plugin.addCommand({
 		id: 'open-settings',
 		name: t('打开设置'),
 		callback: () => {

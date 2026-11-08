@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import {
 	DEFAULT_TAG,
 	anchorTag,
+	countLegacyAnchors,
 	fingerprint,
 	insertAnchors,
 	matchEntries,
+	migrateAnchors,
 	newAnchorId,
 	removeAnchors,
 	scanAnchors,
@@ -18,9 +20,10 @@ test('锚点 id 是 6 位小写字母数字', () => {
 	}
 });
 
-test('锚点标签形态固定为带 id 的空标签对', () => {
-	assert.equal(anchorTag('k7f3q2'), '<pickme id="k7f3q2"></pickme>');
-	assert.equal(anchorTag('k7f3q2', 'mytag'), '<mytag id="k7f3q2"></mytag>');
+test('锚点标记形态固定为带 data 属性的空 span 对', () => {
+	// 用标准标签 + data-*：自定义标签会被 Obsidian 的渲染器丢掉，阅读视图里就没有标记了
+	assert.equal(anchorTag('k7f3q2'), '<span data-pickme="k7f3q2"></span>');
+	assert.equal(anchorTag('k7f3q2', 'mytag'), '<span data-mytag="k7f3q2"></span>');
 });
 
 test('插入锚点后扫描能还原选区，且原文其他字节不变', () => {
@@ -38,13 +41,31 @@ test('插入锚点后扫描能还原选区，且原文其他字节不变', () =>
 	assert.equal(scan.malformed, 0);
 });
 
-test('锚点不包裹选区文字，格式标记留在标签外面', () => {
+test('锚点不包裹选区文字，格式标记留在标记外面', () => {
 	const source = '这里含**粗体**与*斜体*。';
 	const from = source.indexOf('含');
 	const to = source.indexOf('。');
 	const out = insertAnchors(source, from, to, 'abc123');
-	assert.equal(out, `这里<${DEFAULT_TAG} id="abc123"></${DEFAULT_TAG}>含**粗体**与*斜体*<${DEFAULT_TAG} id="abc123"></${DEFAULT_TAG}>。`);
+	assert.equal(out, `这里<span data-${DEFAULT_TAG}="abc123"></span>含**粗体**与*斜体*<span data-${DEFAULT_TAG}="abc123"></span>。`);
 	assert.equal(scanAnchors(out).pairs[0].text, '含**粗体**与*斜体*');
+});
+
+test('老格式锚点能被识别并迁到新格式', () => {
+	const tag = DEFAULT_TAG;
+	const legacy = `<${tag} id="aaa111"></${tag}>老文字<${tag} id="aaa111"></${tag}> 与 <${tag} id="bbb222"></${tag}>另一段<${tag} id="bbb222"></${tag}>`;
+	assert.equal(countLegacyAnchors(legacy, tag), 4);
+	assert.equal(scanAnchors(legacy, tag).pairs.length, 0, '解析器只认新格式');
+
+	const migrated = migrateAnchors(legacy, tag);
+	assert.deepEqual(migrated.ids, ['aaa111', 'aaa111', 'bbb222', 'bbb222']);
+	assert.equal(countLegacyAnchors(migrated.text, tag), 0);
+	const scan = scanAnchors(migrated.text, tag);
+	assert.deepEqual(scan.pairs.map((p) => [p.id, p.text]), [
+		['aaa111', '老文字'],
+		['bbb222', '另一段'],
+	]);
+	// 迁移只换标记，不动文字
+	assert.equal(stripAnchors(migrated.text, tag), '老文字 与 另一段');
 });
 
 test('同一个 id 只出现一次时判定为损坏，且不影响其他锚点', () => {

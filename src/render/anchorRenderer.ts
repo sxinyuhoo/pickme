@@ -83,16 +83,17 @@ export function buildEditorExtension(plugin: PickmePlugin): Extension {
 	);
 }
 
-/** 阅读视图：把两个锚点标签之间的文字包进带类名的 span */
+/** 阅读视图：把两个锚点标记之间的文字包进带类名的 span */
 export function buildPostProcessor(plugin: PickmePlugin) {
 	return (el: HTMLElement, ctx: MarkdownPostProcessorContext): void => {
 		const tag = plugin.settings.tagName;
-		const tags = Array.from(el.querySelectorAll(tag));
+		// 新格式是 <span data-xxx="id">：span 是标准标签，渲染器会保留它（自定义标签会被丢掉）
+		const tags = Array.from(el.querySelectorAll(`span[data-${CSS.escape(tag)}]`));
 		if (tags.length === 0) return;
 
 		const byId = new Map<string, HTMLElement[]>();
 		for (const node of tags) {
-			const id = node.getAttribute('id') ?? '';
+			const id = node.getAttribute(`data-${tag}`) ?? '';
 			if (!id) continue;
 			const list = byId.get(id) ?? [];
 			list.push(node as HTMLElement);

@@ -155,7 +155,7 @@ One line per release; the full notes live in [CHANGELOG.md](./CHANGELOG.md).
 - No hover on touch screens: annotations open by tapping their edge, band or icon rather than by hovering.
 - On mobile the request path goes through `requestUrl`, which cannot stream — the answer appears in one piece instead of typing itself out.
 - When the window is minimized or fully occluded, Chromium stops `requestAnimationFrame` and pdf.js rendering pauses; it repaints when the window returns.
-- Anchor tags are visible in source mode (`<pickme id="xxxxxx"></pickme>`) but hidden in editing and reading views.
+- Anchors are written as an empty standard span — `<span data-pickme="xxxxxx"></span>` — so Obsidian keeps them and reading view can draw the marks. They are visible as text in source mode only. Notes written before 1.6.11 use the old custom tag; run the **Migrate anchors to the new format** command once (it counts first, backs up every touched note into the plugin folder, and verifies afterwards).
 - Highlights rely on the reading-view post-processor and a CodeMirror extension; if another plugin decorates the same text, Obsidian's render wins.
 
 ## Development

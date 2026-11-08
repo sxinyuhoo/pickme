@@ -18,7 +18,7 @@ export interface PickmeSettings {
 	/** 模板目录 */
 	templateDir: string;
 	/** 批注索引笔记路径，留空表示不生成 */
-	/** 锚点标签名 */
+	/** 锚点标记属性名（写成 <span data-<这个名字>="id">） */
 	tagName: string;
 	/** OpenAI 兼容接口地址 */
 	apiBaseUrl: string;
@@ -629,8 +629,10 @@ export class PickmeSettingTab extends PluginSettingTab {
 				heading: t('锚点与外观'),
 				items: [
 					{
-						name: t('锚点标签名'),
-						desc: t('正文里写成一对尖括号标签，默认 pickme。改动标签名后，已有锚点需要重新插入才能识别。'),
+						name: t('锚点标记名'),
+						desc: t(
+							'正文里写成一对方括号里的属性，形如 span data-锚点名="id"，默认 pickme。改名后要把已有锚点一起替换（命令面板里的「批量替换锚点标签名」）。',
+						),
 						aliases: ['anchor', 'tag'],
 						control: {
 							type: 'text',
