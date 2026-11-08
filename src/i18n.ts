@@ -38,6 +38,7 @@ export const EN: Record<string, string> = {
 	'批注': 'Note',
 	'编辑': 'Edit',
 	'还没有批注内容': 'No note yet',
+	'就在这个框里改这条批注': 'Edit this note right in this box',
 	'展开或收起这个文档的批注': 'Expand or collapse this document\u2019s annotations',
 	'问 AI': 'Ask AI',
 	'连同锚点一起删掉': 'Delete it together with its anchor',

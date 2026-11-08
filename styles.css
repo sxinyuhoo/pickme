@@ -1860,30 +1860,49 @@ body.pickme-mark-border .pickme-mark {
 }
 
 
-/* 已保存的那条批注：回显 + 「编辑」把焦点送回输入框 */
-.pickme-note-saved {
-	display: flex;
-	align-items: flex-start;
-	gap: 8px;
-	margin-top: 8px;
-	padding: 6px 8px;
+/* 批注只有一套逻辑：编辑态给输入框，展示态给渲染结果，两态互斥 */
+.pickme-note.is-editing .pickme-note-view {
+	display: none;
+}
+
+.pickme-note.is-viewing .pickme-note-input {
+	display: none;
+}
+
+.pickme-note.is-viewing .pickme-note-view {
+	display: block;
+	margin-bottom: 8px;
+	padding: 7px 9px;
 	border-left: 2px solid var(--pk-acc-line);
 	border-radius: 0 var(--pk-r-sm) var(--pk-r-sm) 0;
 	background: var(--pk-surface2);
-	font-size: var(--pk-fs-sm);
-	color: var(--pk-ink3);
-}
-
-.pickme-note-saved.is-empty {
-	border-left-color: var(--pk-line);
-	color: var(--pk-ink5);
-}
-
-.pickme-note-saved-text {
-	flex: 1 1 auto;
-	min-width: 0;
-	white-space: pre-wrap;
+	color: var(--pk-ink2);
+	font-size: var(--pk-fs);
+	line-height: 1.55;
 	word-break: break-word;
+}
+
+/* 渲染出来的 Markdown 里，段落和列表的间距收一收，别把面板撑太高 */
+.pickme-note-view > :first-child {
+	margin-top: 0;
+}
+
+.pickme-note-view > :last-child {
+	margin-bottom: 0;
+}
+
+.pickme-note-view ul,
+.pickme-note-view ol {
+	margin: 4px 0;
+	padding-left: 18px;
+}
+
+.pickme-note-view p {
+	margin: 4px 0;
+}
+
+.pickme-note-empty {
+	color: var(--pk-ink5);
 }
 
 .pickme-note-edit {

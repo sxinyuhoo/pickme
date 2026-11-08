@@ -362,11 +362,34 @@ export class AskPanel implements AskSink {
 	 */
 	private renderNoteBox(root: HTMLElement, entry: AnnotationEntry): void {
 		const box = root.createDiv({ cls: 'pickme-note' });
+		// 展示态：把已保存的批注按 Markdown 渲染出来（和正文用同一个渲染器）
+		const view = box.createDiv({ cls: 'pickme-note-view' });
+		// 编辑态：这条批注唯一的编辑处
 		const input = box.createEl('textarea', { cls: 'pickme-note-input' });
 		this.noteInput = input;
 		input.rows = 3;
 		input.placeholder = isStickyEntry(entry) ? t('写点什么…（⌘/Ctrl + Enter 保存）') : t('写点批注…（⌘/Ctrl + Enter 保存）');
 		input.value = entry.note ?? '';
+
+		/**
+		 * 只保留一套逻辑：没有内容时直接给输入框；有内容时先渲染出来看，点「编辑」就地变输入框。
+		 * 以前是「输入框 + 已保存回显」同时摆着，两边内容一样，看着冗余。
+		 */
+		const setEditing = (editing: boolean): void => {
+			box.toggleClass('is-editing', editing);
+			box.toggleClass('is-viewing', !editing);
+			if (editing) {
+				input.focus();
+				return;
+			}
+			view.empty();
+			const text = (entry.note ?? '').trim();
+			if (!text) {
+				view.createDiv({ cls: 'pickme-note-empty', text: t('还没有批注内容') });
+				return;
+			}
+			void MarkdownRenderer.render(this.plugin.app, text, view, entry.kind === 'pdf' ? '' : this.file.path, this.child);
+		};
 
 		const row = box.createDiv({ cls: 'pickme-row' });
 		const save = row.createEl('button', { cls: 'mod-cta', text: t('保存批注') });
@@ -378,21 +401,9 @@ export class AskPanel implements AskSink {
 		const remove = row.createEl('button', { cls: 'pickme-note-remove', text: t('删除') });
 		remove.setAttribute('aria-label', sticky ? t('连同便利贴一起删掉') : isText ? t('连同锚点一起删掉') : t('连同这条高亮一起删掉'));
 
-		// 已存下来的那条批注单独回显一份：既证明「确实存进去了」，也能照着它继续改；
-		// 编辑始终走上面那一个输入框——一条批注只有一个内容处
-		const saved = box.createDiv({ cls: 'pickme-note-saved' });
-		const savedText = saved.createSpan({ cls: 'pickme-note-saved-text' });
-		const edit = saved.createEl('button', { cls: 'pickme-note-edit', text: t('编辑') });
-		const refreshSaved = (): void => {
-			const text = (entry.note ?? '').trim();
-			saved.toggleClass('is-empty', text === '');
-			savedText.setText(text === '' ? t('还没有批注内容') : text);
-		};
-		refreshSaved();
-		edit.onclick = () => {
-			input.focus();
-			input.select();
-		};
+		const edit = row.createEl('button', { cls: 'pickme-note-edit', text: t('编辑') });
+		edit.setAttribute('aria-label', t('就在这个框里改这条批注'));
+		edit.onclick = () => setEditing(true);
 
 		const saveNote = async () => {
 			const text = input.value.trim();
@@ -400,7 +411,8 @@ export class AskPanel implements AskSink {
 			// 存过就当成「认下了这条批注」：关面板不再撤销它
 			this.fresh = false;
 			entry.note = text || undefined;
-			refreshSaved();
+			// 存完就切回「看」的状态：内容按 Markdown 渲染出来
+			setEditing(false);
 			// 便利贴是「贴完就走」：保存即完成，不用再去点一次关闭（框自己关掉就是反馈）
 			if (isStickyEntry(entry)) {
 				this.close();
@@ -425,6 +437,8 @@ export class AskPanel implements AskSink {
 		});
 		save.onclick = () => void saveNote();
 		ask.onclick = () => this.setPane('ask');
+		// 首次打开：还没有内容就直接给输入框；已经写过就先渲染出来看
+		setEditing(!(entry.note ?? '').trim());
 		remove.onclick = () => {
 			new ConfirmModal(
 				this.plugin.app,

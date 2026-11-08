@@ -29,8 +29,8 @@ export class SelectionBubble {
 	private button: HTMLElement;
 	private view: MarkdownView | null = null;
 	private timer: number | null = null;
-	/** 点过的那段文字：同一段选区不再冒头，直到选区变了或清掉 */
-	private suppressText: string | null = null;
+	/** 点过之后的短暂静默期（毫秒时间戳）：避免点击自己触发的事件把浮框又叫回来 */
+	private suppressUntil = 0;
 
 	constructor(plugin: PickmePlugin) {
 		this.plugin = plugin;
@@ -108,22 +108,18 @@ export class SelectionBubble {
 			this.hide();
 			return;
 		}
-		// 批注面板开着的时候它就是主界面，浮出的按钮只会碍事、还会被夹到屏幕边上
-		if (document.querySelector('.pickme-panel')) {
+		// 批注面板开着的时候它就是主界面，浮出的按钮只会碍事、还会被夹到屏幕边上。
+		// 只认「真的挂在界面上」的面板：插件重载可能留下不可见的旧面板，那种不该一直挡着浮框
+		if (this.visiblePanel()) {
 			this.hide();
 			return;
 		}
 		const selection = window.getSelection();
 		const domText = selection && !selection.isCollapsed && selection.rangeCount > 0 ? selection.toString().trim() : '';
-		// 刚点过的那一段（面板已经从它开出来了）：只要选区还是它，就别再冒头；
-		// 换成别的选区或把选区清掉，就恢复正常
-		const current = domText || this.editorSelectionText(view);
-		if (this.suppressText !== null) {
-			if (!current || current === this.suppressText) {
-				this.hide();
-				return;
-			}
-			this.suppressText = null;
+		// 刚点过的那一下有个短暂静默期：那次点击自己会触发一轮事件，别让它立刻又冒头
+		if (Date.now() < this.suppressUntil) {
+			this.hide();
+			return;
 		}
 		if (!domText) {
 			// 编辑态里 DOM 选区有时是空的（编辑器没拿到焦点），退回编辑器自己的选区
@@ -152,9 +148,12 @@ export class SelectionBubble {
 		this.show(range);
 	}
 
-	/** 编辑器自己的选区文字（DOM 选区为空时用它来判断「还是不是刚才那段」） */
-	private editorSelectionText(view: MarkdownView): string {
-		return view.editor.getSelection().trim();
+	/** 界面上真的有一个开着的批注面板吗（不可见的遗留面板不算） */
+	private visiblePanel(): boolean {
+		for (const el of Array.from(document.querySelectorAll<HTMLElement>('.pickme-panel'))) {
+			if (el.offsetParent !== null && el.getBoundingClientRect().height > 0) return true;
+		}
+		return false;
 	}
 
 	/** 编辑器选区 → 屏幕坐标（CM6 的 coordsAtPos 给的是一行内的高亮矩形） */
@@ -214,9 +213,8 @@ export class SelectionBubble {
 		const view = this.view;
 		this.hide();
 		if (!view) return;
-		// 记下这一段：接着弹出的面板就是它的，浮出按钮不该再出现
-		const selection = window.getSelection();
-		this.suppressText = (selection ? selection.toString().trim() : '') || this.editorSelectionText(view) || null;
+		// 点完静默一小会儿：这次点击自己会带出一轮 selectionchange / pointerup
+		this.suppressUntil = Date.now() + 1200;
 		void this.plugin.askSelection(view);
 	}
 }
