@@ -44,7 +44,9 @@ export class PickmeIndexView extends ItemView {
 	private cursorKey: string | null = null;
 
 	/** 当前渲染出来的行：key → 行元素，供勾选与键盘就地更新，不用整屏重画 */
-	private rowEls = new Map<string, HTMLElement>();
+	private rowEls: Map<string, HTMLElement> = new Map();
+	/** 展开着的文档（默认都不在集合里：一打开索引全折叠） */
+	private expandedGroups = new Set<string>();
 	/** 行 key 的显示顺序，供 ↑↓ 在行间移动 */
 	private rowOrder: string[] = [];
 	/** 选择条上要就地更新的两处：已选数字与删除按钮的可用状态 */
@@ -241,12 +243,28 @@ export class PickmeIndexView extends ItemView {
 			const shown = this.showStale() ? group.entries.length : group.entries.filter((entry) => entry.status === 'ok').length;
 			head.createSpan({ cls: 'pickme-count', text: t('{v0} 条', { v0: shown }) });
 
+			// 折叠开关摆在条数标记右边：批注多了以后，默认全收起才找得动
+			const expanded = this.expandedGroups.has(group.sourcePath);
+			const fold = head.createEl('button', { cls: 'pickme-index-fold' });
+			setIcon(fold, 'chevron-right');
+			fold.setAttribute('aria-label', t('展开或收起这个文档的批注'));
+			fold.setAttribute('aria-expanded', String(expanded));
+			fold.onclick = () => {
+				const next = !this.expandedGroups.has(group.sourcePath);
+				if (next) this.expandedGroups.add(group.sourcePath);
+				else this.expandedGroups.delete(group.sourcePath);
+				card.toggleClass('is-collapsed', !next);
+				fold.setAttribute('aria-expanded', String(next));
+			};
+			card.toggleClass('is-collapsed', !expanded);
+			const rows = card.createDiv({ cls: 'pickme-index-rows' });
+
 			// 有效的照常列出；失效的默认折起来，免得看着像一堆坏数据。
 			// 「索引里显示锚点丢失的批注」关掉后整段不渲染（数据仍在批注文件里，不会丢）
 			const live = group.entries.filter((entry) => entry.status === 'ok');
 			const stale = group.entries.filter((entry) => entry.status !== 'ok');
-			for (const entry of live) this.renderEntry(card, group, entry);
-			if (this.showStale() && stale.length > 0) this.renderStale(card, group, stale);
+			for (const entry of live) this.renderEntry(rows, group, entry);
+			if (this.showStale() && stale.length > 0) this.renderStale(rows, group, stale);
 		}
 	}
 

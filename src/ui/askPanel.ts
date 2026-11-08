@@ -128,6 +128,10 @@ export class AskPanel implements AskSink {
 	private fresh = false;
 	/** 当前形态：用户点过「改问 AI」就固定成 'ask' */
 	private mode: 'ask' | 'note' | null = null;
+	/** 「问 AI」栏的默认提示（首次提问 / 追问），切栏时写进共用的状态行 */
+	private askHint = '';
+	/** 批注栏最近一次的状态（保存成功之类），切回来时恢复 */
+	private noteStatus = '';
 	private noteTab: HTMLElement | null = null;
 	private askTab: HTMLElement | null = null;
 	private noteInput: HTMLTextAreaElement | null = null;
@@ -345,7 +349,8 @@ export class AskPanel implements AskSink {
 		this.renderComposer(askPane, entry);
 		// 状态行两栏共用一条：各自建一条的话，setStatus 只会写到最后建的那条上
 		this.statusEl = root.createDiv({ cls: 'pickme-status' });
-		if (entry.qas.length) this.renderHistory(root, entry);
+		// AI 问答只属于「问 AI」那一栏：批注栏里不摆它，两个功能的内容分开
+		if (entry.qas.length) this.renderHistory(askPane, entry);
 		this.setPane(pane);
 		// 内容变了尺寸也变，重排后按锚点再校一次位置
 		this.applyPosition();
@@ -369,11 +374,25 @@ export class AskPanel implements AskSink {
 		ask.setAttribute('aria-label', t('把这条高亮交给 AI 提问'));
 		const sticky = isStickyEntry(entry);
 		const isText = entry.kind === 'text';
-		const remove = row.createEl('button', {
-			cls: 'pickme-note-remove',
-			text: sticky ? t('删除这张便利贴') : isText ? t('删除这条批注') : t('删除这条高亮'),
-		});
+		// 删除按钮两栏统一叫「删除」：具体删的是什么，交给确认框说明
+		const remove = row.createEl('button', { cls: 'pickme-note-remove', text: t('删除') });
 		remove.setAttribute('aria-label', sticky ? t('连同便利贴一起删掉') : isText ? t('连同锚点一起删掉') : t('连同这条高亮一起删掉'));
+
+		// 已存下来的那条批注单独回显一份：既证明「确实存进去了」，也能照着它继续改；
+		// 编辑始终走上面那一个输入框——一条批注只有一个内容处
+		const saved = box.createDiv({ cls: 'pickme-note-saved' });
+		const savedText = saved.createSpan({ cls: 'pickme-note-saved-text' });
+		const edit = saved.createEl('button', { cls: 'pickme-note-edit', text: t('编辑') });
+		const refreshSaved = (): void => {
+			const text = (entry.note ?? '').trim();
+			saved.toggleClass('is-empty', text === '');
+			savedText.setText(text === '' ? t('还没有批注内容') : text);
+		};
+		refreshSaved();
+		edit.onclick = () => {
+			input.focus();
+			input.select();
+		};
 
 		const saveNote = async () => {
 			const text = input.value.trim();
@@ -381,13 +400,15 @@ export class AskPanel implements AskSink {
 			// 存过就当成「认下了这条批注」：关面板不再撤销它
 			this.fresh = false;
 			entry.note = text || undefined;
+			refreshSaved();
 			// 便利贴是「贴完就走」：保存即完成，不用再去点一次关闭（框自己关掉就是反馈）
 			if (isStickyEntry(entry)) {
 				this.close();
 				return;
 			}
 			// 高亮的备注框停在原地，方便接着改或者点「改问 AI」
-			this.setStatus(text ? t('批注已保存') : t('批注已清空'));
+			this.noteStatus = text ? t('批注已保存') : t('批注已清空');
+			this.setStatus(this.noteStatus);
 		};
 		input.addEventListener('keydown', (event) => {
 			// 面板的 Esc 监听挂在问答输入框上，批注框里没有那个元素，得自己接一个：
@@ -443,6 +464,8 @@ export class AskPanel implements AskSink {
 		this.askTab?.toggleClass('is-active', pane === 'ask');
 		this.noteTab?.setAttribute('aria-pressed', String(pane === 'note'));
 		this.askTab?.setAttribute('aria-pressed', String(pane === 'ask'));
+		// 状态行是两栏共用的：切栏时换回这一栏该显示的话
+		this.setStatus(pane === 'ask' ? this.askHint : this.noteStatus);
 	}
 
 	private renderComposer(root: HTMLElement, entry: AnnotationEntry): void {
@@ -539,10 +562,7 @@ export class AskPanel implements AskSink {
 		stop.onclick = () => this.plugin.abortCurrent();
 
 		const rounds = entry.qas.filter((qa) => qa.answer.trim() !== '').length;
-		this.statusEl = box.createDiv({
-			cls: 'pickme-status',
-			text: rounds > 0 ? t('追问：会带上已有 {v0} 轮问答', { v0: rounds }) : t('首次提问'),
-		});
+		this.askHint = rounds > 0 ? t('追问：会带上已有 {v0} 轮问答', { v0: rounds }) : t('首次提问');
 	}
 
 	private renderHistory(root: HTMLElement, entry: AnnotationEntry): void {

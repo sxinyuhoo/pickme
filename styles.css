@@ -1860,6 +1860,87 @@ body.pickme-mark-border .pickme-mark {
 }
 
 
+/* 已保存的那条批注：回显 + 「编辑」把焦点送回输入框 */
+.pickme-note-saved {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	margin-top: 8px;
+	padding: 6px 8px;
+	border-left: 2px solid var(--pk-acc-line);
+	border-radius: 0 var(--pk-r-sm) var(--pk-r-sm) 0;
+	background: var(--pk-surface2);
+	font-size: var(--pk-fs-sm);
+	color: var(--pk-ink3);
+}
+
+.pickme-note-saved.is-empty {
+	border-left-color: var(--pk-line);
+	color: var(--pk-ink5);
+}
+
+.pickme-note-saved-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.pickme-note-edit {
+	flex: 0 0 auto;
+	height: 20px;
+	padding: 0 8px;
+	border: 1px solid var(--pk-line);
+	border-radius: var(--pk-pill);
+	background: transparent;
+	box-shadow: none;
+	color: var(--pk-ink4);
+	font-size: var(--pk-fs-xs);
+	cursor: pointer;
+	transition: var(--pk-t);
+}
+
+.pickme-note-edit:hover {
+	border-color: var(--pk-acc-line);
+	color: var(--pk-acc-ink);
+}
+
+/* 索引里每个文档的折叠开关（摆在条数标记右边） */
+.pickme-index-fold {
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	margin-left: 2px;
+	padding: 0;
+	border: none;
+	background: transparent;
+	box-shadow: none;
+	color: var(--pk-ink4);
+	cursor: pointer;
+	transition: var(--pk-t);
+}
+
+.pickme-index-fold:hover {
+	color: var(--pk-ink);
+}
+
+.pickme-index-fold svg {
+	width: 14px;
+	height: 14px;
+	transition: transform 0.14s ease;
+}
+
+.pickme-index-source .pickme-index-fold[aria-expanded='true'] svg {
+	transform: rotate(90deg);
+}
+
+.pickme-index-group.is-collapsed .pickme-index-rows {
+	display: none;
+}
+
 /* ===== 面板里的「批注 ｜ 问 AI」切换 ===== */
 .pickme-switch {
 	display: inline-flex;
